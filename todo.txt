@@ -5,8 +5,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 # DX/Utility: Library API, PyPI, CLI
 
-(B) Add full type annotations to all public methods in agent/impl.py (perceive, reason, act, run_step) replacing Dict[str,Any] with typed dataclasses +refactor
-(B) Add full type annotations to analytics.py and analytics_advanced.py public functions +refactor
 (B) Add full type annotations to all LLM provider classes (completion, chat_completion return types; error union types) +refactor
 (B) Replace Dict[str,Any] world_state with a typed WorldState dataclass in models.py containing date, timestamp, stage, agents, metrics, events +refactor
 (B) Replace Dict[str,Any] interaction outcome with typed InteractionOutcome dataclass (thought_process, action_type, target, details, confidence) +refactor
