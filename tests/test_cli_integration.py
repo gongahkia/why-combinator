@@ -109,6 +109,48 @@ def test_cli_run_simulation(mock_api_storage):
     # Ensure no error was thrown
     assert "Simulation failed" not in result.stdout
 
+
+def test_cli_export(mock_api_storage):
+    """Test 'simulate export' command."""
+    # Setup
+    sim = api.create_simulation(
+        name="ExportTestApp", 
+        industry="SaaS", 
+        description="Export test", 
+        stage="mvp"
+    )
+    
+    # Use a separate directory for exports
+    output_dir = mock_api_storage.storage_dir.parent / "exports"
+    output_dir.mkdir(exist_ok=True)
+    
+    # Test JSON export
+    result = runner.invoke(app, [
+        "simulate", "export", 
+        str(sim.id),
+        "--output", str(output_dir),
+        "--format", "json"
+    ])
+    
+    assert result.exit_code == 0
+    assert "Exported (json) to" in result.stdout
+    
+    # Verify file existence
+    filename = f"ExportTestApp_{sim.id[:8]}.json"
+    assert (output_dir / filename).exists()
+    
+    # Test Markdown export
+    result_md = runner.invoke(app, [
+        "simulate", "export", 
+        str(sim.id),
+        "--output", str(output_dir),
+        "--format", "md"
+    ])
+    
+    assert result_md.exit_code == 0
+    filename_md = f"ExportTestApp_{sim.id[:8]}.md"
+    assert (output_dir / filename_md).exists()
+
 if __name__ == "__main__":
     # verification section
     print("Run with pytest tests/test_cli_integration.py")
