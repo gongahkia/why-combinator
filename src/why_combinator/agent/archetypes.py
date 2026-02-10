@@ -1,6 +1,6 @@
 """Agent archetypes library - predefined personality/behavior templates."""
 from typing import Dict, Any, List
-from sim_city.models import StakeholderType
+from why_combinator.models import StakeholderType
 
 ARCHETYPES: Dict[str, Dict[str, Any]] = {
     "early_adopter": {

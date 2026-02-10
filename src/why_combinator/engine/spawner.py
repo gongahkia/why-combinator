@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 import uuid
-from sim_city.models import SimulationEntity, AgentEntity, StakeholderType, SimulationStage
+from why_combinator.models import SimulationEntity, AgentEntity, StakeholderType, SimulationStage
 
 def generate_initial_agents(simulation: SimulationEntity) -> List[AgentEntity]:
     """Generate the initial set of agents based on simulation parameters."""

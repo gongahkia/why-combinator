@@ -1,10 +1,10 @@
 from typing import Dict, Any
 
-from sim_city.models import AgentEntity
-from sim_city.agent.base import BaseAgent
-from sim_city.agent.impl import GenericAgent
-from sim_city.events import EventBus
-from sim_city.llm.base import LLMProvider
+from why_combinator.models import AgentEntity
+from why_combinator.agent.base import BaseAgent
+from why_combinator.agent.impl import GenericAgent
+from why_combinator.events import EventBus
+from why_combinator.llm.base import LLMProvider
 
 def create_agent_instance(entity: AgentEntity, event_bus: EventBus, llm_provider: LLMProvider, world_context: Dict[str, Any]) -> BaseAgent:
     """

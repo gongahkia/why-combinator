@@ -7,7 +7,7 @@ load_dotenv()
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = Path(os.getenv("SIM_CITY_DATA_DIR", "data")).absolute()
+DATA_DIR = Path(os.getenv("WHY_COMBINATOR_DATA_DIR", "data")).absolute()
 if not DATA_DIR.is_absolute():
     DATA_DIR = BASE_DIR / DATA_DIR
 

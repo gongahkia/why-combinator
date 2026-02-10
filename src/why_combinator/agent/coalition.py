@@ -1,6 +1,6 @@
 """Agent coalition formation - groups with shared interests."""
 from typing import List, Dict, Any, Set
-from sim_city.agent.relationships import RelationshipGraph
+from why_combinator.agent.relationships import RelationshipGraph
 
 class Coalition:
     """A group of agents with shared interests."""

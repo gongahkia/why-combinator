@@ -1,8 +1,8 @@
 """Agent learning system - extract lessons from past simulation runs."""
 import logging
 from typing import List, Dict, Any
-from sim_city.storage import StorageManager
-from sim_city.models import InteractionLog
+from why_combinator.storage import StorageManager
+from why_combinator.models import InteractionLog
 
 logger = logging.getLogger(__name__)
 

@@ -4,14 +4,14 @@ import signal
 import threading
 from datetime import datetime
 import logging
-from sim_city.models import SimulationEntity, SimulationRun, InteractionLog, MetricSnapshot
-from sim_city.events import EventBus
-from sim_city.agent.base import BaseAgent
-from sim_city.storage import StorageManager
-from sim_city.generation import calculate_basic_metrics, generate_critique_report
-from sim_city.agent.relationships import RelationshipGraph
-from sim_city.agent.emergence import EmergenceDetector
-from sim_city.agent.sentiment import SentimentTracker
+from why_combinator.models import SimulationEntity, SimulationRun, InteractionLog, MetricSnapshot
+from why_combinator.events import EventBus
+from why_combinator.agent.base import BaseAgent
+from why_combinator.storage import StorageManager
+from why_combinator.generation import calculate_basic_metrics, generate_critique_report
+from why_combinator.agent.relationships import RelationshipGraph
+from why_combinator.agent.emergence import EmergenceDetector
+from why_combinator.agent.sentiment import SentimentTracker
 
 logger = logging.getLogger(__name__)
 

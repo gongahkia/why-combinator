@@ -1,4 +1,4 @@
-# `Why Combinator`
+# `Why-Combinator`
 
 ## Stack
 

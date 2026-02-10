@@ -1,8 +1,8 @@
 import httpx
 import logging
 from typing import List, Dict, Optional, Any
-from sim_city.llm.base import LLMProvider
-from sim_city.config import OLLAMA_BASE_URL
+from why_combinator.llm.base import LLMProvider
+from why_combinator.config import OLLAMA_BASE_URL
 
 logger = logging.getLogger(__name__)
 

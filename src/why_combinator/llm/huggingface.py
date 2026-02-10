@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Optional, Any
-from sim_city.llm.base import LLMProvider
-from sim_city.config import HUGGINGFACE_API_KEY
+from why_combinator.llm.base import LLMProvider
+from why_combinator.config import HUGGINGFACE_API_KEY
 
 logger = logging.getLogger(__name__)
 

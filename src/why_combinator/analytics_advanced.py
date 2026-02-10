@@ -4,10 +4,10 @@ import logging
 import json
 from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
-from sim_city.models import InteractionLog, MetricSnapshot, SimulationEntity
-from sim_city.llm.base import LLMProvider
-from sim_city.utils.parsing import extract_json
-from sim_city.storage import StorageManager
+from why_combinator.models import InteractionLog, MetricSnapshot, SimulationEntity
+from why_combinator.llm.base import LLMProvider
+from why_combinator.utils.parsing import extract_json
+from why_combinator.storage import StorageManager
 
 logger = logging.getLogger(__name__)
 

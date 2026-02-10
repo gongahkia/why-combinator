@@ -4,9 +4,9 @@ import queue
 import time
 import logging
 from typing import List, Dict, Any, Optional
-from sim_city.agent.base import BaseAgent
-from sim_city.models import InteractionLog
-from sim_city.storage import StorageManager
+from why_combinator.agent.base import BaseAgent
+from why_combinator.models import InteractionLog
+from why_combinator.storage import StorageManager
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,8 @@ import httpx
 import logging
 import os
 from typing import List, Dict, Optional, Any
-from sim_city.llm.base import LLMProvider
-from sim_city.config import OPENAI_API_KEY
+from why_combinator.llm.base import LLMProvider
+from why_combinator.config import OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 

@@ -3,8 +3,8 @@ import json
 import logging
 from pathlib import Path
 from typing import List, Dict, Optional
-from sim_city.llm.base import LLMProvider
-from sim_city.config import DATA_DIR
+from why_combinator.llm.base import LLMProvider
+from why_combinator.config import DATA_DIR
 
 logger = logging.getLogger(__name__)
 CACHE_DIR = DATA_DIR / "llm_cache"

@@ -2,7 +2,7 @@
 import random
 import time
 from typing import Dict, Any, List
-from sim_city.models import SimulationEntity, MetricSnapshot, InteractionLog
+from why_combinator.models import SimulationEntity, MetricSnapshot, InteractionLog
 
 CUSTOMER_FEEDBACK_TEMPLATES = [
     "I {feeling} this product. {reason}",

@@ -1,10 +1,10 @@
 from typing import Tuple, Optional
-from sim_city.llm.base import LLMProvider
-from sim_city.llm.ollama import OllamaProvider
-from sim_city.llm.openai import OpenAIProvider
-from sim_city.llm.anthropic import AnthropicProvider
-from sim_city.llm.mock import MockProvider
-from sim_city.llm.huggingface import HuggingfaceProvider
+from why_combinator.llm.base import LLMProvider
+from why_combinator.llm.ollama import OllamaProvider
+from why_combinator.llm.openai import OpenAIProvider
+from why_combinator.llm.anthropic import AnthropicProvider
+from why_combinator.llm.mock import MockProvider
+from why_combinator.llm.huggingface import HuggingfaceProvider
 
 class LLMFactory:
     """Factory for creating LLM providers."""

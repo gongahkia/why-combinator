@@ -1,4 +1,4 @@
-"""SimCity CLI - AI-powered startup simulation engine."""
+"""Why-Combinator CLI - AI-powered startup simulation engine."""
 import typer
 import time
 import uuid
@@ -11,21 +11,21 @@ from rich.panel import Panel
 from rich.live import Live
 from rich.table import Table
 from datetime import datetime
-from sim_city.config import ensure_directories, LOG_LEVEL, DATA_DIR, BASE_DIR
-from sim_city.models import SimulationEntity, SimulationStage
-from sim_city.storage import TinyDBStorageManager
-from sim_city.engine.core import SimulationEngine
-from sim_city.engine.spawner import generate_initial_agents
-from sim_city.agent.factory import create_agent_instance
-from sim_city.llm.factory import LLMFactory
-from sim_city.llm.cache import CachedLLMProvider
-from sim_city.events import Event
-from sim_city.dashboard import SimulationDashboard, KeyboardListener
-from sim_city.agent.learning import inject_lessons_into_agent
-from sim_city.analytics import compare_simulations, export_json, export_csv, risk_assessment
+from why_combinator.config import ensure_directories, LOG_LEVEL, DATA_DIR, BASE_DIR
+from why_combinator.models import SimulationEntity, SimulationStage
+from why_combinator.storage import TinyDBStorageManager
+from why_combinator.engine.core import SimulationEngine
+from why_combinator.engine.spawner import generate_initial_agents
+from why_combinator.agent.factory import create_agent_instance
+from why_combinator.llm.factory import LLMFactory
+from why_combinator.llm.cache import CachedLLMProvider
+from why_combinator.events import Event
+from why_combinator.dashboard import SimulationDashboard, KeyboardListener
+from why_combinator.agent.learning import inject_lessons_into_agent
+from why_combinator.analytics import compare_simulations, export_json, export_csv, risk_assessment
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-app = typer.Typer(name="sim-city", help="AI-powered startup simulation engine.", add_completion=True, rich_markup_mode="rich")
+app = typer.Typer(name="why-combinator", help="AI-powered startup simulation engine.", add_completion=True, rich_markup_mode="rich")
 simulate_app = typer.Typer(help="Manage simulations")
 app.add_typer(simulate_app, name="simulate")
 console = Console()
@@ -33,7 +33,7 @@ TEMPLATES_DIR = BASE_DIR / "configs" / "templates"
 
 @app.callback()
 def main():
-    """SimCity: AI-powered startup simulation engine."""
+    """Why-Combinator: AI-powered startup simulation engine."""
     ensure_directories()
 
 @simulate_app.command("new")
@@ -71,7 +71,7 @@ def new_simulation(
     for agent in agents:
         storage.save_agent(sim_id, agent)
         console.print(f" - Spawned agent: [bold]{agent.name}[/bold] ({agent.role})")
-    console.print(f"\n[bold]Ready to run![/bold] Use: [cyan]sim-city simulate run {sim_id}[/cyan]")
+    console.print(f"\n[bold]Ready to run![/bold] Use: [cyan]why-combinator simulate run {sim_id}[/cyan]")
 
 @simulate_app.command("run")
 def run_simulation(
@@ -266,7 +266,7 @@ def export_simulation(
     fmt: str = typer.Option("json", "--format", help="Export format: json, csv, md, pdf"),
 ):
     """Export simulation data in various formats."""
-    from sim_city.export import export_json_report, export_csv_report, export_markdown_report, export_pdf_report
+    from why_combinator.export import export_json_report, export_csv_report, export_markdown_report, export_pdf_report
     storage = TinyDBStorageManager()
     simulation = storage.get_simulation(simulation_id)
     if not simulation:
@@ -297,7 +297,7 @@ def import_simulation(path: str = typer.Argument(..., help="Path to JSON bundle"
     data = json.loads(Path(path).read_text())
     sim = SimulationEntity.from_dict(data["simulation"])
     storage.create_simulation(sim)
-    from sim_city.models import AgentEntity
+    from why_combinator.models import AgentEntity
     for a in data.get("agents", []):
         storage.save_agent(sim.id, AgentEntity.from_dict(a))
     console.print(f"[green]Imported simulation: {sim.name} ({sim.id})[/green]")
@@ -306,16 +306,16 @@ def import_simulation(path: str = typer.Argument(..., help="Path to JSON bundle"
 def tutorial():
     """Interactive tutorial with sample simulation."""
     console.print(Panel(
-        "[bold]Welcome to SimCity Tutorial![/bold]\n\n"
-        "SimCity simulates startup ecosystems using AI agents.\n"
+        "[bold]Welcome to Why-Combinator Tutorial![/bold]\n\n"
+        "Why-Combinator simulates startup ecosystems using AI agents.\n"
         "Each agent (customer, investor, competitor, etc.) makes\n"
         "autonomous decisions based on their role and personality.\n\n"
         "[cyan]Quick Start:[/cyan]\n"
-        "1. Create: [bold]sim-city simulate new --template saas[/bold]\n"
-        "2. Run:    [bold]sim-city simulate run <id> --model mock --speed 100[/bold]\n"
-        "3. View:   [bold]sim-city simulate status <id>[/bold]\n"
-        "4. Logs:   [bold]sim-city simulate logs <id>[/bold]\n"
-        "5. Compare:[bold]sim-city simulate compare <id1> <id2>[/bold]\n\n"
+        "1. Create: [bold]why-combinator simulate new --template saas[/bold]\n"
+        "2. Run:    [bold]why-combinator simulate run <id> --model mock --speed 100[/bold]\n"
+        "3. View:   [bold]why-combinator simulate status <id>[/bold]\n"
+        "4. Logs:   [bold]why-combinator simulate logs <id>[/bold]\n"
+        "5. Compare:[bold]why-combinator simulate compare <id1> <id2>[/bold]\n\n"
         "[dim]Templates: saas, marketplace, fintech, hardware[/dim]\n"
         "[dim]Models: ollama:llama3, openai:gpt-4o, anthropic:claude-3-opus, mock[/dim]",
         title="Tutorial", border_style="cyan"

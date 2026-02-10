@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from sim_city.dashboard import AGENT_AVATARS
+from why_combinator.dashboard import AGENT_AVATARS
 
 def ascii_relationship_graph(agents: List[Dict[str, Any]], edges: List[Tuple[str, str, Dict[str, Any]]]) -> str:
     """Build ASCII relationship graph showing connections."""

@@ -1,5 +1,5 @@
 [project]
-name = "sim-city"
+name = "why-combinator"
 version = "0.1.0"
 description = "AI-powered startup simulation engine"
 authors = [
@@ -16,10 +16,10 @@ dependencies = [
 ]
 
 [project.scripts]
-sim-city = "sim_city.cli:app"
+why-combinator = "why_combinator.cli:app"
 
 [tool.poetry]
-packages = [{include = "sim_city", from = "src"}]
+packages = [{include = "why_combinator", from = "src"}]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

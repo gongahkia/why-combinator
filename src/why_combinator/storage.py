@@ -4,8 +4,8 @@ from pathlib import Path
 import json
 from tinydb import TinyDB, Query, where
 
-from sim_city.models import SimulationEntity, AgentEntity, InteractionLog, MetricSnapshot, SimulationStage
-from sim_city.config import SIMULATIONS_DIR
+from why_combinator.models import SimulationEntity, AgentEntity, InteractionLog, MetricSnapshot, SimulationStage
+from why_combinator.config import SIMULATIONS_DIR
 
 
 class StorageManager(ABC):

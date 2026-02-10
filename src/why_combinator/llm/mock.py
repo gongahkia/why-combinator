@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 import json
 import random
-from sim_city.llm.base import LLMProvider
+from why_combinator.llm.base import LLMProvider
 
 class MockProvider(LLMProvider):
     """Mock LLM provider for testing."""

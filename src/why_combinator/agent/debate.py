@@ -2,9 +2,9 @@
 import json
 import logging
 from typing import List, Dict, Any, Optional
-from sim_city.agent.base import BaseAgent
-from sim_city.llm.base import LLMProvider
-from sim_city.utils.parsing import extract_json
+from why_combinator.agent.base import BaseAgent
+from why_combinator.llm.base import LLMProvider
+from why_combinator.utils.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 

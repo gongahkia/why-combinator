@@ -2,7 +2,7 @@
 import logging
 from typing import List, Dict, Any, Optional
 from collections import Counter
-from sim_city.models import InteractionLog
+from why_combinator.models import InteractionLog
 
 logger = logging.getLogger(__name__)
 

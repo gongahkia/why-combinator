@@ -2,8 +2,8 @@
 import random
 import logging
 from typing import List, Dict, Any, Optional
-from sim_city.models import SimulationEntity, SimulationStage
-from sim_city.events import EventBus
+from why_combinator.models import SimulationEntity, SimulationStage
+from why_combinator.events import EventBus
 
 logger = logging.getLogger(__name__)
 

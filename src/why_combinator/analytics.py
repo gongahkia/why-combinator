@@ -6,8 +6,8 @@ import random
 import io
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
-from sim_city.models import SimulationEntity, InteractionLog, MetricSnapshot
-from sim_city.storage import StorageManager
+from why_combinator.models import SimulationEntity, InteractionLog, MetricSnapshot
+from why_combinator.storage import StorageManager
 
 class ScenarioBranch:
     """Represents a what-if scenario branch from a simulation."""

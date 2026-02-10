@@ -12,7 +12,7 @@ class PromptTemplate:
 
 # Simulation context injected into every prompt
 SIMULATION_CONTEXT = """
-You are an agent in a startup simulation called SimCity.
+You are an agent in a startup simulation called Why-Combinator.
 Current Industry: {industry}
 Current Startup Stage: {stage}
 Startup Name: {startup_name}

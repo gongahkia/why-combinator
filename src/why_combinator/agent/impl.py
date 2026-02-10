@@ -1,12 +1,12 @@
 from typing import Dict, Any, Optional
 import logging
 import json
-from sim_city.models import AgentEntity, InteractionLog
-from sim_city.events import EventBus
-from sim_city.agent.base import BaseAgent
-from sim_city.llm.base import LLMProvider
-from sim_city.agent.prompts import SIMULATION_CONTEXT, AGENT_IDENTITY, DECISION_PROMPT, PromptTemplate
-from sim_city.utils.parsing import extract_json
+from why_combinator.models import AgentEntity, InteractionLog
+from why_combinator.events import EventBus
+from why_combinator.agent.base import BaseAgent
+from why_combinator.llm.base import LLMProvider
+from why_combinator.agent.prompts import SIMULATION_CONTEXT, AGENT_IDENTITY, DECISION_PROMPT, PromptTemplate
+from why_combinator.utils.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 

@@ -11,7 +11,7 @@ from rich.table import Table
 from rich.layout import Layout
 from rich.text import Text
 from rich.live import Live
-from sim_city.events import Event
+from why_combinator.events import Event
 
 AGENT_AVATARS = { # ascii art per stakeholder type
     "customer": "[bold green]$[/bold green]",
@@ -65,7 +65,7 @@ class SimulationDashboard:
         txt.append(f" {self.simulation_name} ", style="bold")
         txt.append(f" | Tick: {self.tick} | {self.sim_date} | ", style="dim")
         txt.append(f"[{self.status.upper()}]", style=f"bold {status_color}")
-        return Panel(txt, title="SimCity", border_style=status_color)
+        return Panel(txt, title="Why-Combinator", border_style=status_color)
     def build_agents_panel(self) -> Panel:
         table = Table(show_header=True, header_style="bold", expand=True, padding=(0, 1))
         table.add_column("", width=2)

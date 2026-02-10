@@ -2,7 +2,7 @@
 import random
 import time
 from typing import Dict, Any, List
-from sim_city.models import SimulationEntity
+from why_combinator.models import SimulationEntity
 
 def generate_testimonials(simulation: SimulationEntity, count: int = 5) -> List[Dict[str, Any]]:
     """Generate realistic user testimonials and reviews."""

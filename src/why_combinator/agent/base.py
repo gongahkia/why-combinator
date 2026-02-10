@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 
-from sim_city.models import AgentEntity, InteractionLog
-from sim_city.events import EventBus
+from why_combinator.models import AgentEntity, InteractionLog
+from why_combinator.events import EventBus
 
 
 class BaseAgent(ABC):
