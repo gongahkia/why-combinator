@@ -1,4 +1,5 @@
 from typing import Tuple, Optional
+import logging
 from why_combinator.llm.base import LLMProvider
 from why_combinator.llm.ollama import OllamaProvider
 from why_combinator.llm.openai import OpenAIProvider
@@ -12,6 +13,8 @@ from why_combinator.config import (
     HUGGINGFACE_API_KEY,
 )
 
+logger = logging.getLogger(__name__)
+
 class LLMFactory:
     """Factory for creating LLM providers."""
 
@@ -23,7 +26,35 @@ class LLMFactory:
             - ollama:llama3
             - openai:gpt-4o
             - anthropic:claude-3-opus-20240229
+            
+        Implements fallback chain: requested -> ollama -> mock
         """
+        try:
+            return LLMFactory._create_instance(provider_spec)
+        except ConfigError as e:
+            logger.warning(f"Failed to initialize provider {provider_spec}: {e}")
+            
+            # Fallback chain
+            # If current attempt was NOT fallback (i.e. checking if we can step down)
+            
+            # 1. Fallback to Ollama if looking for API-based provider
+            if "ollama" not in provider_spec and "mock" not in provider_spec:
+                fallback = "ollama:llama3"
+                logger.warning(f"Falling back to {fallback}")
+                return LLMFactory.create(fallback)
+                
+            # 2. Fallback to Mock if Ollama fails (or was requested)
+            elif "mock" not in provider_spec:
+                fallback = "mock"
+                logger.warning(f"Falling back to {fallback}")
+                return LLMFactory.create(fallback)
+                
+            # 3. If Mock fails (unlikely) or unknown error, raise
+            raise e
+
+    @staticmethod
+    def _create_instance(provider_spec: str) -> LLMProvider:
+        """Internal creation logic."""
         if ":" in provider_spec:
             provider_type, model = provider_spec.split(":", 1)
         else:
