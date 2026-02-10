@@ -12,7 +12,9 @@ def generate_initial_agents(simulation: SimulationEntity) -> List[AgentEntity]:
     agents.append(create_agent(type=StakeholderType.COMPETITOR, role="Incumbent", simulation=simulation, personality={"aggression": 0.6, "adaptability": 0.3}, behavior_rules=["Monitor market for new entrants", "Protect market share"]))
     if simulation.stage in [SimulationStage.MVP, SimulationStage.LAUNCH, SimulationStage.GROWTH]:
         role = "Angel Investor" if simulation.stage == SimulationStage.MVP else "VC Partner"
-        agents.append(create_agent(type=StakeholderType.INVESTOR, role=role, simulation=simulation, personality={"risk_tolerance": 0.7 if simulation.stage == SimulationStage.MVP else 0.4}, behavior_rules=["Seek high ROI", "Evaluate team and traction"]))
+        burn_threshold = simulation.parameters.get("investor_burn_limit", 15.0)
+        rule = f"Reject funding if monthly burn rate is > {burn_threshold}x monthly revenue"
+        agents.append(create_agent(type=StakeholderType.INVESTOR, role=role, simulation=simulation, personality={"risk_tolerance": 0.7 if simulation.stage == SimulationStage.MVP else 0.4}, behavior_rules=["Seek high ROI", "Evaluate team and traction", rule]))
     industry_lower = simulation.industry.lower()
     regulator_name = "Generic Regulator"
     if "fintech" in industry_lower or "finance" in industry_lower:
@@ -42,11 +44,21 @@ def create_agent(type: StakeholderType, role: str, simulation: SimulationEntity,
     for name in archetype_names:
         arch = get_archetype(name)
         if arch and arch.get("role", "").lower() in role.lower() or role.lower() in arch.get("role", "").lower():
+            # Merge rules: archetype rules + specific rules passed
+            merged_rules = arch.get("behavior_rules", []) + behavior_rules
+            # Deduplicate preserving order
+            seen = set()
+            final_rules = []
+            for r in merged_rules:
+                if r not in seen:
+                    final_rules.append(r)
+                    seen.add(r)
+            
             return AgentEntity(
                 id=str(uuid.uuid4()), type=type, role=arch.get("role", role),
                 personality=arch.get("personality", personality),
                 knowledge_base=arch.get("knowledge_base", [f"Knowledge about {simulation.industry}", f"Expertise in {role}"]),
-                behavior_rules=arch.get("behavior_rules", behavior_rules),
+                behavior_rules=final_rules,
                 name=f"{arch.get('role', role)} ({type.value.title()})"
             )
     return AgentEntity(
