@@ -286,16 +286,40 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
     morale_factor = 1.0 + len(employee_actions) * 0.001 
     burn_rate *= morale_factor
 
-    revenue = buy_count_total * price_per_unit
+    revenue = cumulative_revenue
     
-    # Runway calculation
+    # Runway Calculation (Iterative Growth Model)
+    # Allows factoring in revenue and burn growth rates vs static snapshot
     initial_capital = params.get("initial_capital", 500000)
     months_elapsed = max(tick_count / 30, 1)
-    # Approximate cumulative burn
+    
+    # Approximate cumulative burn via current rate (imperfect but consistent with snapshot approach)
     cumulative_burn = burn_rate * months_elapsed
     
-    monthly_burn = burn_rate if burn_rate > 0 else 1
-    runway_months = max((initial_capital - cumulative_burn + revenue) / monthly_burn, 0)
+    current_cash = initial_capital - cumulative_burn + revenue 
+    
+    if current_cash <= 0:
+        runway_months = 0.0
+    else:
+        # Get growth rates (MoM)
+        revenue_growth_rate = params.get("revenue_growth_rate", 0.05) 
+        burn_growth_rate = params.get("burn_growth_rate", 0.02)
+        
+        sim_runway = 0
+        temp_cash = current_cash
+        sim_revenue = monthly_revenue
+        sim_burn = burn_rate
+        
+        # Simulate up to 60 months (5 years)
+        while temp_cash > 0 and sim_runway < 60:
+            sim_runway += 1
+            # Next month projection
+            sim_revenue *= (1 + revenue_growth_rate)
+            sim_burn *= (1 + burn_growth_rate)
+            net_burn = sim_burn - sim_revenue
+            temp_cash -= net_burn
+            
+        runway_months = float(sim_runway)
 
     return {
         "adoption_rate": round(adoption_rate, 4),
