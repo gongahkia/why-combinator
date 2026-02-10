@@ -86,74 +86,64 @@ def run_simulation(
     speed: float = typer.Option(1.0, help="Simulation speed multiplier"),
     duration: int = typer.Option(100, help="Number of ticks to run"),
     resume: bool = typer.Option(False, help="Resume from last checkpoint"),
+    headless: bool = typer.Option(False, help="Headless mode - suppress interactive output"),
 ):
     """Run an existing simulation."""
     storage = TinyDBStorageManager()
     simulation = storage.get_simulation(simulation_id)
-    
     if not simulation:
-        console.print(f"[red]Simulation {simulation_id} not found![/red]")
+        if not headless:
+            console.print(f"[red]Simulation {simulation_id} not found![/red]")
         raise typer.Exit(code=1)
-
-    console.print(f"[bold green]Starting Simulation: {simulation.name}[/bold green]")
-    console.print(f"Industry: {simulation.industry} | Stage: {simulation.stage.value}")
-    console.print(f"Model: {model} | Speed: {speed}x\n")
-
-    # Initialize Engine
+    if not headless:
+        console.print(f"[bold green]Starting Simulation: {simulation.name}[/bold green]")
+        console.print(f"Industry: {simulation.industry} | Stage: {simulation.stage.value}")
+        console.print(f"Model: {model} | Speed: {speed}x\n")
     engine = SimulationEngine(simulation, storage)
     engine.speed_multiplier = speed
-    
-    # Load LLM Provider
     try:
         llm = LLMFactory.create(model)
     except Exception as e:
-        console.print(f"[red]Failed to initialize LLM: {e}[/red]")
+        if not headless:
+            console.print(f"[red]Failed to initialize LLM: {e}[/red]")
         raise typer.Exit(code=1)
-
-    # Hydrate Agents
     agent_entities = storage.get_agents(simulation_id)
     for entity in agent_entities:
         agent_instance = create_agent_instance(
             entity=entity,
             event_bus=engine.event_bus,
             llm_provider=llm,
-            world_context={
-                "id": simulation.id,
-                "name": simulation.name,
-                "description": simulation.description,
-                "industry": simulation.industry,
-                "stage": simulation.stage.value
-            }
+            world_context={"id": simulation.id, "name": simulation.name, "description": simulation.description, "industry": simulation.industry, "stage": simulation.stage.value}
         )
         engine.spawn_agent(agent_instance)
     if resume:
-        if engine.restore_from_checkpoint():
-            console.print(f"[green]Restored from checkpoint at tick {engine.tick_count}[/green]")
-        else:
-            console.print("[yellow]No checkpoint found, starting fresh.[/yellow]")
-    # Event Listener for UI updates
-    def on_tick(event: Event):
-        # We can implement a richer UI here
-        pass
-        
-    def on_interaction(event: Event):
-        agent_id = event.payload.get("agent_id")
-        action = event.payload.get("action")
-        target = event.payload.get("target")
-        outcome = event.payload.get("outcome", {})
-        console.print(f"[cyan]{agent_id[:8]}..[/cyan] [bold]{action}[/bold] -> {target}: {str(outcome)[:100]}")
-
-    def on_pause(event: Event):
-        console.print("[yellow]Paused. Ctrl-C again to stop, or wait to resume.[/yellow]")
-    def on_resume(event: Event):
-        console.print("[green]Resumed.[/green]")
-    engine.event_bus.subscribe("tick", on_tick)
-    engine.event_bus.subscribe("interaction_occurred", on_interaction)
-    engine.event_bus.subscribe("simulation_paused", on_pause)
-    engine.event_bus.subscribe("simulation_resumed", on_resume)
-    console.print("[dim]Ctrl-C once to pause, twice to stop.[/dim]")
+        restored = engine.restore_from_checkpoint()
+        if not headless:
+            if restored:
+                console.print(f"[green]Restored from checkpoint at tick {engine.tick_count}[/green]")
+            else:
+                console.print("[yellow]No checkpoint found, starting fresh.[/yellow]")
+    if not headless:
+        def on_tick(event: Event):
+            pass
+        def on_interaction(event: Event):
+            agent_id = event.payload.get("agent_id")
+            action = event.payload.get("action")
+            target = event.payload.get("target")
+            outcome = event.payload.get("outcome", {})
+            console.print(f"[cyan]{agent_id[:8]}..[/cyan] [bold]{action}[/bold] -> {target}: {str(outcome)[:100]}")
+        def on_pause(event: Event):
+            console.print("[yellow]Paused. Ctrl-C again to stop.[/yellow]")
+        def on_resume(event: Event):
+            console.print("[green]Resumed.[/green]")
+        engine.event_bus.subscribe("tick", on_tick)
+        engine.event_bus.subscribe("interaction_occurred", on_interaction)
+        engine.event_bus.subscribe("simulation_paused", on_pause)
+        engine.event_bus.subscribe("simulation_resumed", on_resume)
+        console.print("[dim]Ctrl-C once to pause, twice to stop.[/dim]")
     engine.run_loop(max_ticks=duration)
-    console.print(f"[bold]Simulation finished at tick {engine.tick_count}.[/bold]")
+    if not headless:
+        console.print(f"[bold]Simulation finished at tick {engine.tick_count}.[/bold]")
 
 
 @simulate_app.command("inspect")
