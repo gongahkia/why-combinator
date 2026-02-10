@@ -72,6 +72,77 @@ def compare_simulations(storage: StorageManager, sim_ids: List[str]) -> Dict[str
         comparison["metric_comparison"][mt] = {s["name"]: s["metrics"].get(mt, 0) for s in comparison["simulations"]}
     return comparison
 
+import statistics
+
+def calculate_statistics(values: List[float]) -> Dict[str, float]:
+    if not values:
+        return {}
+    n = len(values)
+    values.sort()
+    
+    stats = {
+        "mean": statistics.mean(values),
+        "min": values[0],
+        "max": values[-1],
+        "p50": statistics.median(values)
+    }
+    if n > 1:
+        stats["stddev"] = statistics.stdev(values)
+    else:
+        stats["stddev"] = 0.0
+        
+    # Percentiles
+    def get_p(p):
+        idx = int(p * n)
+        return values[min(idx, n-1)]
+        
+    stats["p5"] = get_p(0.05)
+    stats["p95"] = get_p(0.95)
+    
+    # Confidence Interval (95%)
+    if n > 1:
+        sem = stats["stddev"] / (n ** 0.5)
+        stats["ci_95_lower"] = stats["mean"] - 1.96 * sem
+        stats["ci_95_upper"] = stats["mean"] + 1.96 * sem
+    else:
+        stats["ci_95_lower"] = stats["mean"]
+        stats["ci_95_upper"] = stats["mean"]
+    
+    return stats
+
+def aggregate_simulation_batch(storage: StorageManager, experiment_name_prefix: str) -> Dict[str, Dict[str, float]]:
+    """Aggregate metrics across multiple runs of an experiment."""
+    sims = storage.list_simulations()
+    # Filter by name prefix
+    batch_sims = [s for s in sims if s.name.startswith(experiment_name_prefix)]
+    
+    if not batch_sims:
+        return {}
+        
+    # Collect final metrics for each metric type
+    metric_values: Dict[str, List[float]] = {}
+    
+    for sim in batch_sims:
+        metrics = storage.get_metrics(sim.id)
+        if not metrics:
+            continue
+            
+        # Get latest for each type
+        latest_map = {}
+        for m in metrics:
+            # Assume sorted by time? Or just iterate and replace
+            latest_map[m.metric_type] = m.value
+            
+        for m_type, val in latest_map.items():
+            metric_values.setdefault(m_type, []).append(val)
+            
+    # Calculate stats
+    results = {}
+    for m_type, values in metric_values.items():
+        results[m_type] = calculate_statistics(values)
+        
+    return results
+
 def predict_outcome(metrics_history: List[MetricSnapshot], metric_type: str, horizon: int = 10) -> List[float]:
     """Simple linear extrapolation prediction for a metric."""
     values = [m.value for m in metrics_history if m.metric_type == metric_type]
