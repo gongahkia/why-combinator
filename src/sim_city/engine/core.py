@@ -10,6 +10,7 @@ from sim_city.agent.base import BaseAgent
 from sim_city.storage import StorageManager
 from sim_city.generation import calculate_basic_metrics, generate_critique_report
 from sim_city.agent.relationships import RelationshipGraph
+from sim_city.agent.emergence import EmergenceDetector
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class SimulationEngine:
         self.speed_multiplier = 1.0
         self.world_state: Dict[str, Any] = {}
         self.relationships = RelationshipGraph()
+        self.emergence_detector = EmergenceDetector()
         self._orig_sigint = None
         self._orig_sigterm = None
     def _install_signal_handlers(self):
@@ -91,6 +93,7 @@ class SimulationEngine:
             if interaction:
                 self.storage.log_interaction(interaction)
                 self.relationships.update_from_interaction(interaction.agent_id, interaction.target, interaction.action)
+                self.emergence_detector.observe(interaction)
         self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time, "date": date_str}, self.current_time)
         if self.tick_count % 10 == 0: # calculate metrics every 10 ticks
             self._emit_metrics()
