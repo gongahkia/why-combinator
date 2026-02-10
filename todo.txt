@@ -4,10 +4,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 ================================================================================
 
 # Stability/Scaling: Async, Storage, Error Handling, Tests
-(B) Convert SimulationEngine.step() to async; use asyncio.gather() with semaphore to run agent.run_step() concurrently with configurable max_concurrent param +performance
-(B) Convert all LLM provider completion() methods to async using httpx.AsyncClient instead of httpx.Client +performance
-(B) Add async_completion() implementation to AnthropicProvider and HuggingfaceProvider matching OllamaProvider pattern +performance
-(B) Add asyncio.Semaphore to engine tick loop limiting concurrent LLM calls to prevent API rate limit exhaustion +performance +security
 (B) Implement SQLite storage backend as new class SqliteStorageManager in storage.py implementing StorageManager ABC +feature +infra
 (B) Add SQLite schema: simulations table (id, name, industry, stage, config_json, created_at), agents table (id, sim_id, type, personality_json), interactions table (id, sim_id, agent_id, tick, action_type, details_json, timestamp), metrics table (sim_id, tick, metric_type, value, timestamp) +feature +infra
 (B) Add SQLite indexes on interactions(sim_id, tick), metrics(sim_id, metric_type), agents(sim_id) for cross-sim query performance +performance +infra
