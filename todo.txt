@@ -4,7 +4,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 ================================================================================
 
 # Stability/Scaling: Async, Storage, Error Handling, Tests
-(B) Add sentiment_tracker history pruning: keep only last N ticks of history per agent (configurable, default 200) +performance
 (B) Add Pydantic or manual validation to SimulationEntity fields in models.py: stage must be valid SimulationStage, industry non-empty, name length 1-100 +security
 (B) Add LLM response schema validation in agent/impl.py reason(): check required keys (action_type, thought_process) exist; retry once with explicit schema reminder if missing +security +feature
 (B) Add JSON schema definition for expected agent LLM response format in agent/prompts.py; include in system prompt for structured output guidance +security
