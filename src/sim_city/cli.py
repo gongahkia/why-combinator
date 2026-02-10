@@ -138,16 +138,17 @@ def run_simulation(
         outcome = event.payload.get("outcome", {})
         console.print(f"[cyan]{agent_id[:8]}..[/cyan] [bold]{action}[/bold] -> {target}: {str(outcome)[:100]}")
 
+    def on_pause(event: Event):
+        console.print("[yellow]Paused. Ctrl-C again to stop, or wait to resume.[/yellow]")
+    def on_resume(event: Event):
+        console.print("[green]Resumed.[/green]")
     engine.event_bus.subscribe("tick", on_tick)
     engine.event_bus.subscribe("interaction_occurred", on_interaction)
-
-    # simple spinner or just run
-    try:
-        engine.run_loop(max_ticks=duration)
-    except KeyboardInterrupt:
-        console.print("[yellow]Simulation paused by user.[/yellow]")
-    finally:
-        engine.stop()
+    engine.event_bus.subscribe("simulation_paused", on_pause)
+    engine.event_bus.subscribe("simulation_resumed", on_resume)
+    console.print("[dim]Ctrl-C once to pause, twice to stop.[/dim]")
+    engine.run_loop(max_ticks=duration)
+    console.print(f"[bold]Simulation finished at tick {engine.tick_count}.[/bold]")
 
 
 @simulate_app.command("inspect")
