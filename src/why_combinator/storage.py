@@ -5,7 +5,7 @@ import json
 import sqlite3
 from tinydb import TinyDB, Query, where
 
-from why_combinator.models import SimulationEntity, AgentEntity, InteractionLog, MetricSnapshot, SimulationStage
+from why_combinator.models import SimulationEntity, AgentEntity, InteractionLog, MetricSnapshot, SimulationStage, MetricFilter
 from why_combinator.config import SIMULATIONS_DIR
 
 
@@ -53,7 +53,7 @@ class StorageManager(ABC):
         pass
 
     @abstractmethod
-    def query_metrics(self, metric_type: Optional[str] = None, simulation_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    def query_metrics(self, filters: Optional[MetricFilter] = None) -> Dict[str, Any]:
         """Query metrics across simulations with optional filters. Returns aggregated statistics."""
         pass
 
@@ -153,10 +153,13 @@ class TinyDBStorageManager(StorageManager):
         db.close()
         return result
 
-    def query_metrics(self, metric_type: Optional[str] = None, simulation_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    def query_metrics(self, filters: Optional[MetricFilter] = None) -> Dict[str, Any]:
         """Query metrics across simulations. Returns aggregated statistics."""
         import statistics
         all_metrics = []
+
+        metric_type = filters.metric_type if filters else None
+        simulation_ids = filters.simulation_ids if filters else None
         
         # Get simulations to query
         target_sims = simulation_ids if simulation_ids else [s.id for s in self.list_simulations()]
@@ -477,10 +480,13 @@ class SqliteStorageManager(StorageManager):
             for row in rows
         ]
 
-    def query_metrics(self, metric_type: Optional[str] = None, simulation_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+    def query_metrics(self, filters: Optional[MetricFilter] = None) -> Dict[str, Any]:
         """Query metrics across simulations with SQL aggregation."""
         conn = self._get_connection()
         cursor = conn.cursor()
+
+        metric_type = filters.metric_type if filters else None
+        simulation_ids = filters.simulation_ids if filters else None
         
         # Build query
         query = """

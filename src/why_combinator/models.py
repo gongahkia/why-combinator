@@ -219,3 +219,10 @@ class MetricSnapshot:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class MetricFilter:
+    """Filter options for aggregated metric queries."""
+    metric_type: Optional[str] = None
+    simulation_ids: Optional[List[str]] = None
