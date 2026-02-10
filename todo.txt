@@ -3,21 +3,6 @@ Tech Stack: Python CLI (Typer/Rich), TinyDB/JSON+SQLite, Ollama/Huggingface/LLM 
 Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Research reproducibility + economic plausibility.
 ================================================================================
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # DX/Utility: Library API, PyPI, CLI
 (B) Refactor cli.py to be a thin wrapper: move all business logic from CLI command handlers into engine/ or a new src/why_combinator/api.py module +refactor
 (B) Create src/why_combinator/api.py with public functions: create_simulation(), run_simulation(), list_simulations(), get_metrics(), export_simulation() callable without Typer +refactor +feature
