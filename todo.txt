@@ -14,7 +14,7 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 
 
-(B) Add market saturation mechanic in engine/scenarios.py: adoption growth rate decreases as market_share approaches TAM ceiling +economics +feature
+
 (B) Add diminishing returns to competitive_market: new entrants face increasing CAC as market becomes crowded +economics +feature
 (B) Add agent behavioral invariant assertions in agent/base.py: configurable rules (e.g., cannot invest with 0 capital) that raise on violation during simulation +reproducibility +security
 
