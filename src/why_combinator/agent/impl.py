@@ -5,7 +5,7 @@ from why_combinator.models import AgentEntity, InteractionLog, WorldState, Inter
 from why_combinator.events import EventBus
 from why_combinator.agent.base import BaseAgent
 from why_combinator.llm.base import LLMProvider
-from why_combinator.agent.prompts import SIMULATION_CONTEXT, AGENT_IDENTITY, DECISION_PROMPT, MEMORY_SUMMARIZATION_PROMPT, PromptTemplate
+from why_combinator.agent.prompts import SIMULATION_CONTEXT, AGENT_IDENTITY, DECISION_PROMPT, MEMORY_SUMMARIZATION_PROMPT, PromptTemplate, AGENT_RESPONSE_SCHEMA
 from why_combinator.utils.parsing import extract_json
 
 logger = logging.getLogger(__name__)
@@ -129,7 +129,8 @@ class GenericAgent(BaseAgent):
             else:
                 sentiment_str = "\nMARKET SENTIMENT: The market sentiment is NEUTRAL/STABLE.\n"
         full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}{difficulty_str}{sentiment_str}\n{prompt}"
-        response_text = await self.llm_provider.async_completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
+        system_prompt = f"You are a role-playing agent in a business simulation.\n{AGENT_RESPONSE_SCHEMA}"
+        response_text = await self.llm_provider.async_completion(prompt=full_prompt, system_prompt=system_prompt)
         decision = extract_json(response_text)
         required_keys = ("action_type", "thought_process")
         missing_keys = [k for k in required_keys if not (isinstance(decision, dict) and decision.get(k))]
@@ -142,7 +143,7 @@ class GenericAgent(BaseAgent):
             retry_prompt = f"{full_prompt}\n\nSCHEMA REMINDER:\n{schema_reminder}"
             retry_text = await self.llm_provider.async_completion(
                 prompt=retry_prompt,
-                system_prompt="You are a role-playing agent in a business simulation. Follow the JSON schema exactly."
+                system_prompt=f"You are a role-playing agent in a business simulation. Follow the JSON schema exactly.\n{AGENT_RESPONSE_SCHEMA}"
             )
             retry_decision = extract_json(retry_text)
             retry_missing = [k for k in required_keys if not (isinstance(retry_decision, dict) and retry_decision.get(k))]

@@ -4,7 +4,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 ================================================================================
 
 # Stability/Scaling: Async, Storage, Error Handling, Tests
-(B) Add JSON schema definition for expected agent LLM response format in agent/prompts.py; include in system prompt for structured output guidance +security
 (B) Standardize retry logic across all LLM providers: extract RetryPolicy(max_retries, backoff_base, retryable_status_codes) into llm/base.py; apply uniformly +refactor +security
 (B) Add retry logic to AnthropicProvider.completion() matching OpenAI pattern (3 retries, exponential backoff on 429/500/503) +security
 (B) Add graceful API key validation in LLMFactory.create(): check env var exists before instantiation; raise ConfigError with clear message naming the missing key +security
