@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
 
 from why_combinator.models import AgentEntity, InteractionLog
 from why_combinator.events import EventBus
@@ -16,7 +19,12 @@ class BaseAgent(ABC):
         self.strategy: str = "" # current high-level strategy
         self.difficulty: float = 1.0 # 1.0=baseline, increases over time
         self._steps_taken: int = 0
+        self._invariants: List[Tuple[str, Callable[[InteractionLog, Dict[str, Any]], bool]]] = [] 
         self.event_bus.subscribe("agent_message", self._on_message)
+        
+    def add_invariant(self, name: str, check: Callable[[InteractionLog, Dict[str, Any]], bool]):
+        """Register an invariant check. Raises exception if check returns False."""
+        self._invariants.append((name, check))
     def _on_message(self, event):
         """Receive messages targeted at this agent."""
         if event.payload.get("target_id") == self.entity.id:
@@ -76,6 +84,13 @@ class BaseAgent(ABC):
         decision = self.reason(perception)
         interaction = self.act(decision)
         if interaction:
+            # Check invariants
+            for name, check in self._invariants:
+                if not check(interaction, world_state):
+                    error_msg = f"Invariant '{name}' violated by agent {self.entity.id} ({self.entity.role}) on action {interaction.action}"
+                    logger.error(error_msg)
+                    raise RuntimeError(error_msg)
+                    
             interaction.timestamp = timestamp
             interaction.agent_id = self.entity.id
             self.event_bus.publish("interaction_occurred", interaction.to_dict(), timestamp)

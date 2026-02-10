@@ -16,6 +16,24 @@ class GenericAgent(BaseAgent):
         super().__init__(entity, event_bus)
         self.llm_provider = llm_provider
         self.world_context = world_context
+        
+        # Add basic invariants
+        self.add_invariant("role_integrity", self._check_role_integrity)
+        
+    def _check_role_integrity(self, interaction: InteractionLog, world_state: Dict[str, Any]) -> bool:
+        """Ensure actions are consistent with agent role."""
+        action = interaction.action.lower()
+        role = self.entity.type.value
+        
+        # Restricted actions
+        if action == "invest" and role != "investor":
+            return False
+        if action == "regulate" and role != "regulator":
+            return False
+        if action == "code" and role != "employee":
+            return False
+            
+        return True
     def perceive(self, world_state: Dict[str, Any]) -> Dict[str, Any]:
         perception = dict(world_state)
         messages = self.get_pending_messages()
