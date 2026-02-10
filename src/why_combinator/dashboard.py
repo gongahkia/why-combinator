@@ -12,6 +12,7 @@ from rich.layout import Layout
 from rich.text import Text
 from rich.live import Live
 from why_combinator.events import Event
+from why_combinator.visualization import ascii_relationship_graph, ascii_sentiment_gauge
 
 AGENT_AVATARS = { # ascii art per stakeholder type
     "customer": "[bold green]$[/bold green]",
@@ -56,8 +57,10 @@ class SimulationDashboard:
         self.sim_date = ""
         self.status = "running"
         self.agents: List[Dict[str, Any]] = []
-        self.event_log: deque = deque(maxlen=15) # last 15 events
-        self.metrics: Dict[str, List[float]] = {} # metric_type -> history
+        self.event_log: deque = deque(maxlen=15)
+        self.metrics: Dict[str, List[float]] = {}
+        self.sentiments: Dict[str, float] = {}
+        self.relationship_edges: List[Any] = []
         self._live: Optional[Live] = None
     def build_header(self) -> Panel:
         status_color = {"running": "green", "paused": "yellow", "stopped": "red"}.get(self.status, "white")
@@ -92,6 +95,12 @@ class SimulationDashboard:
             lines.append(f"{name:>15}: {current:>8.2f}  {spark}")
         content = "\n".join(lines) if lines else "[dim]No metrics yet...[/dim]"
         return Panel(content, title="Metrics", border_style="green")
+    def build_relationships_panel(self) -> Panel:
+        content = ascii_relationship_graph(self.agents, self.relationship_edges) if self.relationship_edges else "[dim]No relationships yet...[/dim]"
+        return Panel(content, title="Relationships", border_style="magenta")
+    def build_sentiment_panel(self) -> Panel:
+        content = ascii_sentiment_gauge(self.sentiments) if self.sentiments else "[dim]No sentiment data...[/dim]"
+        return Panel(content, title="Sentiment", border_style="blue")
     def build_controls_hint(self) -> Text:
         t = Text()
         t.append(" p", style="bold yellow")
@@ -109,6 +118,8 @@ class SimulationDashboard:
             self.build_agents_panel(),
             self.build_event_feed(),
             self.build_metrics_panel(),
+            self.build_relationships_panel(),
+            self.build_sentiment_panel(),
             self.build_controls_hint(),
         )
     def on_tick(self, event: Event):
@@ -117,9 +128,15 @@ class SimulationDashboard:
         if self._live:
             self._live.update(self.render())
     def on_interaction(self, event: Event):
+        agent_id = event.payload.get("agent_id", "")
+        agent_name = agent_id[:8]
+        for a in self.agents:
+            if a.get("id") == agent_id:
+                agent_name = a.get("name", agent_id[:8])
+                break
         self.event_log.append({
-            "agent_id": event.payload.get("agent_id", ""),
-            "agent_name": event.payload.get("agent_id", "?")[:8],
+            "agent_id": agent_id,
+            "agent_name": agent_name,
             "action": event.payload.get("action", ""),
             "target": event.payload.get("target", ""),
             "content": str(event.payload.get("outcome", ""))[:60],
@@ -140,6 +157,10 @@ class SimulationDashboard:
         self.status = "stopped"
         if self._live:
             self._live.update(self.render())
+    def on_sentiment(self, event: Event):
+        self.sentiments = event.payload.get("sentiments", {})
+    def on_relationships(self, event: Event):
+        self.relationship_edges = event.payload.get("edges", [])
     def set_live(self, live: Live):
         self._live = live
 

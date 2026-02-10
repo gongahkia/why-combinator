@@ -111,19 +111,40 @@ def sensitivity_analysis(simulation: SimulationEntity, base_metrics: Dict[str, f
     return results
 
 class CustomMetricBuilder:
-    """Let users define custom KPI formulas."""
+    """Let users define custom KPI formulas using safe arithmetic evaluation."""
     def __init__(self):
-        self.definitions: Dict[str, str] = {} # name -> formula string
+        self.definitions: Dict[str, str] = {}
     def define(self, name: str, formula: str):
         """Define a custom metric. formula uses metric names as variables, e.g. 'adoption_rate / churn_rate'."""
         self.definitions[name] = formula
     def calculate(self, name: str, metrics: Dict[str, float]) -> float:
-        """Calculate a custom metric from current metrics."""
+        """Calculate a custom metric using safe AST-based evaluation."""
+        import ast
+        import operator
         formula = self.definitions.get(name)
         if not formula:
             return 0.0
+        ops = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv, ast.USub: operator.neg}
+        def _eval(node):
+            if isinstance(node, ast.Expression):
+                return _eval(node.body)
+            elif isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+                return float(node.value)
+            elif isinstance(node, ast.Name) and node.id in metrics:
+                return float(metrics[node.id])
+            elif isinstance(node, ast.BinOp) and type(node.op) in ops:
+                left = _eval(node.left)
+                right = _eval(node.right)
+                if isinstance(node.op, ast.Div) and right == 0:
+                    return 0.0
+                return ops[type(node.op)](left, right)
+            elif isinstance(node, ast.UnaryOp) and type(node.op) in ops:
+                return ops[type(node.op)](_eval(node.operand))
+            else:
+                raise ValueError(f"Unsupported expression: {ast.dump(node)}")
         try:
-            return float(eval(formula, {"__builtins__": {}}, metrics)) # safe eval with only metric vars
+            tree = ast.parse(formula, mode='eval')
+            return float(_eval(tree))
         except Exception:
             return 0.0
     def calculate_all(self, metrics: Dict[str, float]) -> Dict[str, float]:

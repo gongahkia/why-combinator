@@ -63,8 +63,15 @@ class BaseAgent(ABC):
         pass
     def run_step(self, world_state: Dict[str, Any], timestamp: float) -> Optional[InteractionLog]:
         self._steps_taken += 1
-        if self._steps_taken % 20 == 0: # scale difficulty every 20 steps
+        if self._steps_taken % 20 == 0:
             self.difficulty = min(3.0, self.difficulty + 0.1)
+        # Memory reflection every 10 steps
+        if self._steps_taken % 10 == 0 and len(self.memory) >= 5:
+            recent = self.memory[-10:]
+            actions = [m["content"] for m in recent if m.get("role") == "internal"]
+            if actions:
+                summary = f"Reflection: Over my last {len(actions)} decisions, my focus has been on {actions[-1][:60] if actions else 'various activities'}."
+                self.memory.insert(0, {"content": summary, "role": "reflection", "timestamp": timestamp})
         perception = self.perceive(world_state)
         decision = self.reason(perception)
         interaction = self.act(decision)

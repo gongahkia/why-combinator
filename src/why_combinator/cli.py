@@ -46,6 +46,7 @@ def new_simulation(
 ):
     """Create a new simulation."""
     storage = TinyDBStorageManager()
+    sim_params = {}
     if template:
         tpl_path = TEMPLATES_DIR / f"{template}.toml"
         if tpl_path.exists():
@@ -59,12 +60,13 @@ def new_simulation(
             industry = industry or sim_cfg.get("industry", "General")
             description = description or sim_cfg.get("description", "")
             stage = stage or sim_cfg.get("stage", "idea")
+            sim_params = tpl.get("parameters", {})
             console.print(f"[cyan]Using template: {template}[/cyan]")
         else:
             console.print(f"[yellow]Template '{template}' not found. Available: {', '.join(p.stem for p in TEMPLATES_DIR.glob('*.toml'))}[/yellow]")
     sim_id = str(uuid.uuid4())
     stage_enum = SimulationStage(stage.lower())
-    simulation = SimulationEntity(id=sim_id, name=name, description=description, industry=industry, stage=stage_enum, parameters={}, created_at=time.time())
+    simulation = SimulationEntity(id=sim_id, name=name, description=description, industry=industry, stage=stage_enum, parameters=sim_params, created_at=time.time())
     storage.create_simulation(simulation)
     console.print(f"[green]Created simulation: {name} ({sim_id})[/green]")
     agents = generate_initial_agents(simulation)
@@ -82,8 +84,14 @@ def run_simulation(
     resume: bool = typer.Option(False, help="Resume from last checkpoint"),
     headless: bool = typer.Option(False, help="Headless mode"),
     cache: bool = typer.Option(False, help="Cache LLM responses"),
+    seed: Optional[int] = typer.Option(None, help="Random seed for reproducible simulations"),
+    parallel: bool = typer.Option(False, help="Run agent steps concurrently"),
+    max_failures: Optional[int] = typer.Option(None, help="Stop after N consecutive agent failures"),
 ):
     """Run an existing simulation."""
+    import random as _random
+    if seed is not None:
+        _random.seed(seed)
     storage = TinyDBStorageManager()
     simulation = storage.get_simulation(simulation_id)
     if not simulation:
@@ -92,6 +100,8 @@ def run_simulation(
         raise typer.Exit(code=1)
     engine = SimulationEngine(simulation, storage)
     engine.speed_multiplier = speed
+    if max_failures is not None:
+        engine._max_failures = max_failures
     try:
         llm = LLMFactory.create(model)
         if cache:
@@ -121,6 +131,7 @@ def run_simulation(
     engine.event_bus.subscribe("simulation_paused", dash.on_pause)
     engine.event_bus.subscribe("simulation_resumed", dash.on_resume)
     engine.event_bus.subscribe("simulation_stopped", dash.on_stop)
+    engine.event_bus.subscribe("sentiment_update", dash.on_sentiment)
     kb = KeyboardListener(engine)
     with Live(dash.render(), console=console, refresh_per_second=4, transient=True) as live:
         dash.set_live(live)
@@ -161,14 +172,22 @@ def inspect_simulation(simulation_id: str = typer.Argument(...), agent_id: Optio
         status_simulation(simulation_id)
 
 @simulate_app.command("status")
-def status_simulation(simulation_id: str):
+def status_simulation(
+    simulation_id: str = typer.Argument(...),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
     """Show status of a simulation."""
+    from why_combinator.export import pipe_friendly_output
     storage = TinyDBStorageManager()
     simulation = storage.get_simulation(simulation_id)
     if not simulation:
         console.print(f"[red]Simulation {simulation_id} not found[/red]")
         raise typer.Exit(1)
     agents = storage.get_agents(simulation_id)
+    if json_output:
+        data = {"simulation": simulation.to_dict(), "agents": [a.to_dict() for a in agents]}
+        print(pipe_friendly_output(data))
+        return
     console.print(Panel(
         f"ID: {simulation.id}\nName: {simulation.name}\nIndustry: {simulation.industry}\n"
         f"Stage: {simulation.stage.value}\nCreated: {datetime.fromtimestamp(simulation.created_at)}\nAgents: {len(agents)}",
@@ -184,10 +203,17 @@ def status_simulation(simulation_id: str):
     console.print(table)
 
 @simulate_app.command("list")
-def list_simulations():
+def list_simulations(
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
     """List all simulations."""
+    from why_combinator.export import pipe_friendly_output
     storage = TinyDBStorageManager()
     sims = storage.list_simulations()
+    if json_output:
+        data = {"simulations": [s.to_dict() for s in sims]}
+        print(pipe_friendly_output(data))
+        return
     table = Table(title="Simulations")
     table.add_column("ID", style="cyan")
     table.add_column("Name", style="green")
@@ -240,8 +266,10 @@ def simulation_logs(
     agent: Optional[str] = typer.Option(None, help="Filter by agent ID"),
     action_type: Optional[str] = typer.Option(None, "--type", help="Filter by action type"),
     limit: int = typer.Option(50, help="Max logs to show"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ):
     """Show simulation interaction logs with filters."""
+    from why_combinator.export import pipe_friendly_output
     storage = TinyDBStorageManager()
     interactions = storage.get_interactions(simulation_id)
     if agent:
@@ -249,6 +277,10 @@ def simulation_logs(
     if action_type:
         interactions = [i for i in interactions if i.action == action_type]
     interactions = interactions[-limit:]
+    if json_output:
+        data = {"interactions": [i.to_dict() for i in interactions]}
+        print(pipe_friendly_output(data))
+        return
     table = Table(title=f"Logs ({len(interactions)} entries)")
     table.add_column("Time", style="dim")
     table.add_column("Agent", style="cyan")
@@ -302,8 +334,59 @@ def import_simulation(path: str = typer.Argument(..., help="Path to JSON bundle"
         storage.save_agent(sim.id, AgentEntity.from_dict(a))
     console.print(f"[green]Imported simulation: {sim.name} ({sim.id})[/green]")
 
+@simulate_app.command("delete")
+def delete_simulation(
+    simulation_id: str = typer.Argument(..., help="ID of the simulation to delete"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
+):
+    """Delete a simulation and its data."""
+    storage = TinyDBStorageManager()
+    simulation = storage.get_simulation(simulation_id)
+    if not simulation:
+        console.print(f"[red]Simulation {simulation_id} not found[/red]")
+        raise typer.Exit(1)
+    if not yes:
+        confirm = typer.confirm(f"Delete simulation '{simulation.name}' ({simulation_id})?")
+        if not confirm:
+            console.print("[yellow]Cancelled.[/yellow]")
+            return
+    db_path = storage._get_db_path(simulation_id)
+    if db_path.exists():
+        db_path.unlink()
+    console.print(f"[green]Deleted simulation: {simulation.name} ({simulation_id})[/green]")
+
+@simulate_app.command("clone")
+def clone_simulation(
+    simulation_id: str = typer.Argument(..., help="ID of the simulation to clone"),
+):
+    """Deep-copy a simulation into a new ID for A/B testing."""
+    import copy
+    storage = TinyDBStorageManager()
+    simulation = storage.get_simulation(simulation_id)
+    if not simulation:
+        console.print(f"[red]Simulation {simulation_id} not found[/red]")
+        raise typer.Exit(1)
+    new_id = str(uuid.uuid4())
+    cloned = copy.deepcopy(simulation)
+    cloned.id = new_id
+    cloned.name = f"{simulation.name} (clone)"
+    cloned.created_at = time.time()
+    cloned.parameters.pop("current_time", None)
+    cloned.parameters.pop("tick_count", None)
+    storage.create_simulation(cloned)
+    agents = storage.get_agents(simulation_id)
+    for agent in agents:
+        cloned_agent = copy.deepcopy(agent)
+        cloned_agent.id = str(uuid.uuid4())
+        storage.save_agent(new_id, cloned_agent)
+    console.print(f"[green]Cloned simulation: {cloned.name} ({new_id})[/green]")
+    console.print(f"  Original: {simulation_id}")
+    console.print(f"  Clone:    {new_id}")
+
 @simulate_app.command("tutorial")
-def tutorial():
+def tutorial(
+    auto_run: bool = typer.Option(False, "--auto", help="Auto-create and run a sample simulation"),
+):
     """Interactive tutorial with sample simulation."""
     console.print(Panel(
         "[bold]Welcome to Why-Combinator Tutorial![/bold]\n\n"
@@ -320,6 +403,29 @@ def tutorial():
         "[dim]Models: ollama:llama3, openai:gpt-4o, anthropic:claude-3-opus, mock[/dim]",
         title="Tutorial", border_style="cyan"
     ))
+    if auto_run:
+        console.print("\n[cyan]Auto-creating and running a sample simulation...[/cyan]")
+        storage = TinyDBStorageManager()
+        sim_id = str(uuid.uuid4())
+        simulation = SimulationEntity(id=sim_id, name="Tutorial SaaS", description="Sample B2B SaaS platform", industry="SaaS", stage=SimulationStage.MVP, parameters={"market_size": 1000000, "initial_capital": 500000}, created_at=time.time())
+        storage.create_simulation(simulation)
+        agents = generate_initial_agents(simulation)
+        for agent in agents:
+            storage.save_agent(sim_id, agent)
+        console.print(f"[green]Created: {simulation.name} ({sim_id})[/green]")
+        console.print(f"[cyan]Running 20 ticks with mock provider...[/cyan]")
+        engine = SimulationEngine(simulation, storage)
+        from why_combinator.llm.mock import MockProvider
+        llm = MockProvider()
+        for entity in storage.get_agents(sim_id):
+            agent_instance = create_agent_instance(entity=entity, event_bus=engine.event_bus, llm_provider=llm, world_context={"id": sim_id, "name": simulation.name, "description": simulation.description, "industry": simulation.industry, "stage": simulation.stage.value})
+            engine.spawn_agent(agent_instance)
+        engine.run_loop(max_ticks=20)
+        report = engine.finalize()
+        console.print(f"\n[bold]Results after 20 ticks:[/bold]")
+        console.print(f"  Interactions: {report['total_interactions']}")
+        console.print(f"  Recommendation: [bold]{report['recommendation']}[/bold]")
+        console.print(f"\n[dim]Explore with: why-combinator simulate status {sim_id}[/dim]")
 
 if __name__ == "__main__":
     app()

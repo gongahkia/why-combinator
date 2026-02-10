@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 import uuid
 from why_combinator.models import SimulationEntity, AgentEntity, StakeholderType, SimulationStage
+from why_combinator.agent.archetypes import get_archetype, get_archetypes_by_type
 
 def generate_initial_agents(simulation: SimulationEntity) -> List[AgentEntity]:
     """Generate the initial set of agents based on simulation parameters."""
@@ -36,6 +37,18 @@ def generate_initial_agents(simulation: SimulationEntity) -> List[AgentEntity]:
     return agents
 
 def create_agent(type: StakeholderType, role: str, simulation: SimulationEntity, personality: Dict[str, Any], behavior_rules: List[str]) -> AgentEntity:
+    # Try to find a matching archetype template
+    archetype_names = get_archetypes_by_type(type)
+    for name in archetype_names:
+        arch = get_archetype(name)
+        if arch and arch.get("role", "").lower() in role.lower() or role.lower() in arch.get("role", "").lower():
+            return AgentEntity(
+                id=str(uuid.uuid4()), type=type, role=arch.get("role", role),
+                personality=arch.get("personality", personality),
+                knowledge_base=arch.get("knowledge_base", [f"Knowledge about {simulation.industry}", f"Expertise in {role}"]),
+                behavior_rules=arch.get("behavior_rules", behavior_rules),
+                name=f"{arch.get('role', role)} ({type.value.title()})"
+            )
     return AgentEntity(
         id=str(uuid.uuid4()), type=type, role=role, personality=personality,
         knowledge_base=[f"Knowledge about {simulation.industry}", f"Expertise in {role}"],

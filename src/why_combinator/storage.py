@@ -63,21 +63,20 @@ class TinyDBStorageManager(StorageManager):
 
     def create_simulation(self, simulation: SimulationEntity) -> str:
         db = self._get_db(simulation.id)
-        # Store metadata in a separate table or default
-        # Using 'metadata' table for simulation info
         metadata_table = db.table('metadata')
         metadata_table.insert(simulation.to_dict())
+        db.close()
         return simulation.id
 
     def get_simulation(self, simulation_id: str) -> Optional[SimulationEntity]:
         path = self._get_db_path(simulation_id)
         if not path.exists():
             return None
-        
+
         db = TinyDB(path)
         metadata_table = db.table('metadata')
-        # Assuming only one record per file in metadata
         record = metadata_table.all()[0]
+        db.close()
         return SimulationEntity.from_dict(record)
 
     def list_simulations(self) -> List[SimulationEntity]:
@@ -102,31 +101,37 @@ class TinyDBStorageManager(StorageManager):
         db = self._get_db(simulation_id)
         agents_table = db.table('agents')
         agents_table.upsert(agent.to_dict(), where('id') == agent.id)
+        db.close()
 
     def get_agents(self, simulation_id: str) -> List[AgentEntity]:
         db = self._get_db(simulation_id)
         agents_table = db.table('agents')
-        return [AgentEntity.from_dict(r) for r in agents_table.all()]
+        result = [AgentEntity.from_dict(r) for r in agents_table.all()]
+        db.close()
+        return result
 
     def log_interaction(self, log: InteractionLog) -> None:
         db = self._get_db(log.simulation_id)
         logs_table = db.table('interactions')
         logs_table.insert(log.to_dict())
+        db.close()
 
     def get_interactions(self, simulation_id: str) -> List[InteractionLog]:
         db = self._get_db(simulation_id)
         logs_table = db.table('interactions')
-        # This implementation does not properly restore the checks for enums, 
-        # but InteractionLog is simple enough.
-        # If needed, add from_dict logic to InteractionLog.
-        return [InteractionLog(**r) for r in logs_table.all()]
+        result = [InteractionLog(**r) for r in logs_table.all()]
+        db.close()
+        return result
 
     def log_metric(self, metric: MetricSnapshot) -> None:
         db = self._get_db(metric.simulation_id)
         metrics_table = db.table('metrics')
         metrics_table.insert(metric.to_dict())
+        db.close()
 
     def get_metrics(self, simulation_id: str) -> List[MetricSnapshot]:
         db = self._get_db(simulation_id)
         metrics_table = db.table('metrics')
-        return [MetricSnapshot(**r) for r in metrics_table.all()]
+        result = [MetricSnapshot(**r) for r in metrics_table.all()]
+        db.close()
+        return result

@@ -12,6 +12,10 @@ from why_combinator.generation import calculate_basic_metrics, generate_critique
 from why_combinator.agent.relationships import RelationshipGraph
 from why_combinator.agent.emergence import EmergenceDetector
 from why_combinator.agent.sentiment import SentimentTracker
+from why_combinator.agent.coalition import CoalitionManager
+from why_combinator.agent.conversation import ConversationManager
+from why_combinator.agent.debate import DebateSession
+from why_combinator.engine.scenarios import MultiPhaseManager, EventGenerator, CompetitiveMarket, get_seasonal_multiplier
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,11 @@ class SimulationEngine:
         self.relationships = RelationshipGraph()
         self.emergence_detector = EmergenceDetector()
         self.sentiment_tracker = SentimentTracker()
+        self.coalition_manager = CoalitionManager()
+        self.phase_manager = MultiPhaseManager(simulation, self.event_bus)
+        self.event_generator = EventGenerator(self.event_bus)
+        self.competitive_market = CompetitiveMarket()
+        self._llm_provider = None
         self._orig_sigint = None
         self._orig_sigterm = None
     def _install_signal_handlers(self):
@@ -58,6 +67,8 @@ class SimulationEngine:
         self.agents.append(agent)
         self.storage.save_agent(self.simulation.id, agent.entity)
         self.event_bus.publish("agent_created", agent.entity.to_dict(), self.current_time)
+        if self._llm_provider is None and hasattr(agent, "llm_provider"):
+            self._llm_provider = agent.llm_provider
     def start(self):
         if self.is_running:
             return
@@ -89,27 +100,86 @@ class SimulationEngine:
         date_str = datetime.fromtimestamp(self.current_time).strftime("%Y-%m-%d %H:%M:%S")
         self.world_state["date"] = date_str
         self.world_state["timestamp"] = self.current_time
+        self.world_state["stage"] = self.simulation.stage.value
         self.world_state["agents"] = [{"id": a.entity.id, "name": a.entity.name, "role": a.entity.role, "type": a.entity.type.value} for a in self.agents]
+        # Inject simulation parameters into world_state
+        self.world_state["parameters"] = self.simulation.parameters
+        # EventGenerator: probabilistic crises/macro/disruptions
+        event = self.event_generator.maybe_trigger(self.tick_count)
+        if event:
+            self.world_state["active_event"] = event
+        else:
+            self.world_state.pop("active_event", None)
+        # CompetitiveMarket: contest market share each tick
+        current_share = getattr(self, "_latest_metrics", {}).get("market_share", 0.1)
+        market_result = self.competitive_market.simulate_step(current_share)
+        self.world_state["market"] = market_result
+        # Inject emergence flags and sentiment into world_state
+        self.world_state["emergence_flags"] = self.emergence_detector.get_flags(since_tick=max(0, len(self.emergence_detector.action_history) - 20))
+        self.world_state["sentiments"] = self.sentiment_tracker.get_all_sentiments()
         for agent in self.agents:
-            interaction = agent.run_step(self.world_state, self.current_time)
+            try:
+                interaction = agent.run_step(self.world_state, self.current_time)
+            except Exception as e:
+                logger.error(f"Agent {agent.entity.id} step failed: {e}")
+                continue
             if interaction:
                 self.storage.log_interaction(interaction)
                 self.relationships.update_from_interaction(interaction.agent_id, interaction.target, interaction.action)
                 self.emergence_detector.observe(interaction)
                 self.sentiment_tracker.record_action(interaction.agent_id, interaction.action, str(interaction.outcome), self.current_time)
         self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time, "date": date_str}, self.current_time)
-        if self.tick_count % 10 == 0: # calculate metrics every 10 ticks
+        if self.tick_count % 10 == 0:
             self._emit_metrics()
+            # Publish sentiment data to dashboard
+            self.event_bus.publish("sentiment_update", {"sentiments": self.sentiment_tracker.get_all_sentiments()}, self.current_time)
+            # Publish emergence flags to dashboard
+            new_flags = self.emergence_detector.get_flags(since_tick=max(0, len(self.emergence_detector.action_history) - 20))
+            if new_flags:
+                self.event_bus.publish("emergence_flags", {"flags": new_flags}, self.current_time)
+            # MultiPhaseManager: check phase transitions
+            metrics = getattr(self, "_latest_metrics", {})
+            self.phase_manager.check_transition(self.tick_count, metrics)
+        # CoalitionManager: detect coalitions every 50 ticks
+        if self.tick_count % 50 == 0:
+            agent_ids = [a.entity.id for a in self.agents]
+            coalitions = self.coalition_manager.detect_coalitions(self.relationships, agent_ids)
+            if coalitions:
+                self.event_bus.publish("coalitions_detected", {"coalitions": [c.to_dict() for c in coalitions]}, self.current_time)
+        # ConversationManager: trigger conversations between allies every 25 ticks
+        if self.tick_count % 25 == 0 and self._llm_provider:
+            for agent in self.agents:
+                allies = self.relationships.get_allies(agent.entity.id)
+                if allies:
+                    ally_agents = [a for a in self.agents if a.entity.id in allies[:2]]
+                    if ally_agents:
+                        conv_mgr = ConversationManager(self._llm_provider)
+                        conv_mgr.trigger_conversation([agent] + ally_agents, topic=f"Strategy discussion about {self.simulation.name}")
+        # DebateSession: trigger debates between rivals every 50 ticks
+        if self.tick_count % 50 == 0 and self._llm_provider:
+            for agent in self.agents:
+                rivals = self.relationships.get_rivals(agent.entity.id)
+                if rivals:
+                    rival_agents = [a for a in self.agents if a.entity.id in rivals[:1]]
+                    if rival_agents:
+                        debate = DebateSession(topic=f"Market direction for {self.simulation.industry}", context=f"Stage: {self.simulation.stage.value}", llm_provider=self._llm_provider, rounds=2)
+                        debate.run([agent] + rival_agents)
+                    break  # one debate per tick cycle
         if self.tick_count % 100 == 0:
             self.checkpoint()
     def checkpoint(self):
         self.simulation.parameters["current_time"] = self.current_time
         self.simulation.parameters["tick_count"] = self.tick_count
-        self.simulation.parameters["agent_memories"] = {a.entity.id: a.memory[-20:] for a in self.agents} # last 20 memories per agent
+        self.simulation.parameters["agent_memories"] = {a.entity.id: a.memory[-20:] for a in self.agents}
+        self.simulation.parameters["relationships"] = self.relationships.to_dict()
+        self.simulation.parameters["emergence_state"] = {"action_history": self.emergence_detector.action_history[-100:], "flags": self.emergence_detector.flags[-50:]}
+        self.simulation.parameters["sentiment_history"] = {aid: entries[-50:] for aid, entries in self.sentiment_tracker._history.items()}
+        self.simulation.parameters["coalitions"] = self.coalition_manager.to_dict()
         db = self.storage._get_db(self.simulation.id)
         meta = db.table("metadata")
         meta.truncate()
         meta.insert(self.simulation.to_dict())
+        db.close()
         logger.info(f"Checkpoint saved at tick {self.tick_count}")
     def restore_from_checkpoint(self):
         """Restore engine state from last checkpoint if available."""
@@ -121,13 +191,29 @@ class SimulationEngine:
             for agent in self.agents:
                 if agent.entity.id in agent_mems:
                     agent.memory = agent_mems[agent.entity.id]
+            if "relationships" in params:
+                self.relationships.from_dict(params["relationships"])
+            if "emergence_state" in params:
+                self.emergence_detector.action_history = params["emergence_state"].get("action_history", [])
+                self.emergence_detector.flags = params["emergence_state"].get("flags", [])
+            if "sentiment_history" in params:
+                from collections import defaultdict
+                self.sentiment_tracker._history = defaultdict(list, {aid: [tuple(e) for e in entries] for aid, entries in params["sentiment_history"].items()})
+            if "coalitions" in params:
+                from why_combinator.agent.coalition import Coalition
+                self.coalition_manager.coalitions = [Coalition(name=c["name"], members=set(c["members"])) for c in params["coalitions"]]
             logger.info(f"Restored from checkpoint at tick {self.tick_count}")
             return True
         return False
     def _emit_metrics(self):
-        """Calculate and emit current metrics."""
+        """Calculate and emit current metrics with seasonal multipliers."""
         interactions = self.storage.get_interactions(self.simulation.id)
         metrics = calculate_basic_metrics(self.simulation, interactions, self.tick_count)
+        # Apply seasonal multipliers
+        seasonal = get_seasonal_multiplier(self.tick_count)
+        for key in seasonal:
+            if key in metrics:
+                metrics[key] = round(metrics[key] * seasonal[key], 4)
         for metric_type, value in metrics.items():
             snapshot = MetricSnapshot(simulation_id=self.simulation.id, timestamp=self.current_time, metric_type=metric_type, value=value)
             self.storage.log_metric(snapshot)

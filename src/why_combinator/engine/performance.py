@@ -33,32 +33,26 @@ class AgentPool:
         return self.active
 
 class MemoryCache:
-    """In-memory LRU-ish cache for frequently accessed data."""
+    """In-memory LRU cache using OrderedDict for O(1) access reordering."""
     def __init__(self, max_size: int = 1000):
+        from collections import OrderedDict
         self.max_size = max_size
-        self._cache: Dict[str, Any] = {}
-        self._access_order: List[str] = []
+        self._cache: 'OrderedDict[str, Any]' = OrderedDict()
     def get(self, key: str) -> Optional[Any]:
         if key in self._cache:
-            self._access_order.remove(key)
-            self._access_order.append(key)
+            self._cache.move_to_end(key)
             return self._cache[key]
         return None
     def set(self, key: str, value: Any):
         if key in self._cache:
-            self._access_order.remove(key)
+            self._cache.move_to_end(key)
         elif len(self._cache) >= self.max_size:
-            evict = self._access_order.pop(0)
-            del self._cache[evict]
+            self._cache.popitem(last=False)
         self._cache[key] = value
-        self._access_order.append(key)
     def invalidate(self, key: str):
         self._cache.pop(key, None)
-        if key in self._access_order:
-            self._access_order.remove(key)
     def clear(self):
         self._cache.clear()
-        self._access_order.clear()
 
 class BatchWriter:
     """Batch interaction writes to reduce I/O frequency."""

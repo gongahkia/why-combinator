@@ -21,6 +21,11 @@ class GenericAgent(BaseAgent):
         messages = self.get_pending_messages()
         if messages:
             perception["incoming_messages"] = [{"from": m.get("sender_name", "?"), "content": m.get("content", "")} for m in messages]
+        # Inject emergence flags and active events for agent awareness
+        if "emergence_flags" in world_state:
+            perception["emergence_flags"] = world_state["emergence_flags"][-3:]
+        if "active_event" in world_state:
+            perception["active_event"] = world_state["active_event"]
         return perception
     def reason(self, perception: Dict[str, Any]) -> Dict[str, Any]:
         sim_context_str = SIMULATION_CONTEXT.format(
@@ -46,11 +51,26 @@ class GenericAgent(BaseAgent):
         goals_str = f"\nYOUR GOALS:\n{self.get_goals_summary()}\n" if self.goals else ""
         strategy_str = f"\nYOUR STRATEGY: {self.strategy}\n" if self.strategy else ""
         difficulty_str = ""
-        if self.difficulty > 1.5:
-            difficulty_str = "\nYou are now more experienced and sophisticated. Be more strategic, consider second-order effects, and make nuanced decisions.\n"
-        elif self.difficulty > 2.0:
+        if self.difficulty > 2.0:
             difficulty_str = "\nYou are a veteran in this market. Think multiple moves ahead, consider game theory, and exploit market inefficiencies.\n"
-        full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}{difficulty_str}\n{prompt}"
+        elif self.difficulty > 1.5:
+            difficulty_str = "\nYou are now more experienced and sophisticated. Be more strategic, consider second-order effects, and make nuanced decisions.\n"
+        # Inject relationship context
+        relationship_str = ""
+        agents_data = perception.get("agents", [])
+        agent_id_to_name = {a.get("id", ""): a.get("name", "?") for a in agents_data}
+        sentiments = perception.get("sentiments", {})
+        my_sentiment = sentiments.get(self.entity.id, 0.0)
+        # Sentiment trend
+        sentiment_str = ""
+        if sentiments:
+            if my_sentiment > 0.2:
+                sentiment_str = "\nMARKET SENTIMENT: The market feels POSITIVE about this startup (rising confidence).\n"
+            elif my_sentiment < -0.2:
+                sentiment_str = "\nMARKET SENTIMENT: The market feels NEGATIVE about this startup (falling confidence).\n"
+            else:
+                sentiment_str = "\nMARKET SENTIMENT: The market sentiment is NEUTRAL/STABLE.\n"
+        full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}{difficulty_str}{sentiment_str}\n{prompt}"
         response_text = self.llm_provider.completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
         decision = extract_json(response_text)
         if not decision:

@@ -15,11 +15,18 @@ dependencies = [
     "python-dotenv (>=1.2.1,<2.0.0)"
 ]
 
+[project.optional-dependencies]
+pdf = ["fpdf2>=2.7.0"]
+dev = ["pytest>=7.0.0"]
+
 [project.scripts]
 why-combinator = "why_combinator.cli:app"
 
 [tool.poetry]
 packages = [{include = "why_combinator", from = "src"}]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
