@@ -11,10 +11,12 @@ from rich.panel import Panel
 from rich.live import Live
 from rich.table import Table
 from datetime import datetime
-from why_combinator.config import ensure_directories, LOG_LEVEL, DATA_DIR, BASE_DIR
+from why_combinator.config import ensure_directories, configure_logging, LOG_LEVEL, DATA_DIR, BASE_DIR
 from why_combinator.models import SimulationEntity, SimulationStage
 from why_combinator.dashboard import SimulationDashboard, KeyboardListener
 import why_combinator.api as api
+
+# Default logging setup - will be reconfigured by flags
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 app = typer.Typer(name="why-combinator", help="AI-powered startup simulation engine.", add_completion=True, rich_markup_mode="rich")
@@ -35,6 +37,7 @@ def new_simulation(
     description: str = typer.Option(None, prompt="Product Description"),
     stage: str = typer.Option("idea", prompt="Current Stage (idea, mvp, launch, growth)"),
     template: Optional[str] = typer.Option(None, help="Use a template (saas, marketplace, fintech, hardware)"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Validate config and print agent roster without persisting"),
 ):
     """Create a new simulation."""
     template_data = None
@@ -49,6 +52,34 @@ def new_simulation(
             console.print(f"[cyan]Using template: {template}[/cyan]")
         else:
             console.print(f"[yellow]Template '{template}' not found. Available: {', '.join(p.stem for p in TEMPLATES_DIR.glob('*.toml'))}[/yellow]")
+    
+    if dry_run:
+        # Dry run mode: validate config and print agent roster without persisting
+        console.print(f"[cyan]DRY RUN MODE - No data will be saved[/cyan]\n")
+        console.print(f"[bold]Simulation Config:[/bold]")
+        console.print(f"  Name: {name}")
+        console.print(f"  Industry: {industry}")
+        console.print(f"  Description: {description}")
+        console.print(f"  Stage: {stage}")
+        
+        # Temporarily create simulation to generate agents
+        from why_combinator.engine.spawner import generate_initial_agents
+        from why_combinator.models import SimulationEntity, SimulationStage
+        temp_sim = SimulationEntity(
+            id="dry-run-temp",
+            name=name,
+            description=description,
+            industry=industry,
+            stage=SimulationStage(stage.lower()),
+            parameters=template_data.get("parameters", {}) if template_data else {},
+            created_at=time.time()
+        )
+        agents = generate_initial_agents(temp_sim)
+        console.print(f"\n[bold]Agent Roster ({len(agents)} agents):[/bold]")
+        for agent in agents:
+            console.print(f"  - {agent.name} ({agent.role}) - {agent.type.value}")
+        console.print(f"\n[green]Validation passed. Run without --dry-run to create.[/green]")
+        return
     
     simulation = api.create_simulation(
         name=name,
@@ -76,9 +107,23 @@ def run_simulation(
     seed: Optional[int] = typer.Option(None, help="Random seed for reproducible simulations"),
     parallel: bool = typer.Option(False, help="Run agent steps concurrently"),
     max_failures: Optional[int] = typer.Option(None, help="Stop after N consecutive agent failures"),
+    log_format: str = typer.Option("human", "--log-format", help="Log format: 'human' or 'json'"),
+    output_dir: Optional[str] = typer.Option(None, "--output-dir", help="Override WHY_COMBINATOR_DATA_DIR for this run"),
 ):
     """Run an existing simulation."""
-    """Run an existing simulation."""
+    # Configure logging based on --log-format flag
+    configure_logging(format_type=log_format)
+    
+    # Override output directory if specified
+    if output_dir:
+        import os
+        from why_combinator import config
+        config.DATA_DIR = Path(output_dir).absolute()
+        config.SIMULATIONS_DIR = config.DATA_DIR / "simulations"
+        os.environ["WHY_COMBINATOR_DATA_DIR"] = str(config.DATA_DIR)
+        ensure_directories()
+        console.print(f"[cyan]Using output directory: {config.DATA_DIR}[/cyan]")
+    
     if headless:
         try:
             report = api.run_simulation(

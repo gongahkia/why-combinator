@@ -6,7 +6,7 @@ import time
 import uuid
 import json
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Protocol
 from pathlib import Path
 
 from why_combinator.models import SimulationEntity, SimulationStage, AgentEntity, InteractionLog
@@ -22,6 +22,22 @@ from why_combinator.export import export_json_report, export_csv_report, export_
 from why_combinator.config import ensure_directories
 
 logger = logging.getLogger(__name__)
+
+
+class ProgressCallback(Protocol):
+    """Protocol for library consumers to receive simulation progress updates."""
+    
+    def on_tick(self, tick: int, metrics: Dict[str, Any]) -> None:
+        """Called after each simulation tick with current metrics."""
+        ...
+    
+    def on_phase_change(self, phase: str) -> None:
+        """Called when the simulation transitions to a new phase."""
+        ...
+    
+    def on_complete(self, summary: Dict[str, Any]) -> None:
+        """Called when the simulation completes."""
+        ...
 
 def _get_storage() -> StorageManager:
     ensure_directories()
@@ -94,7 +110,8 @@ def setup_simulation_engine(
     resume: bool = False,
     cache: bool = False,
     seed: Optional[int] = None,
-    max_failures: Optional[int] = None
+    max_failures: Optional[int] = None,
+    progress_callback: Optional[ProgressCallback] = None
 ) -> SimulationEngine:
     """Initialize and configure a simulation engine."""
     import random as _random
@@ -106,7 +123,7 @@ def setup_simulation_engine(
     if not simulation:
         raise ValueError(f"Simulation {simulation_id} not found")
         
-    engine = SimulationEngine(simulation, storage, seed=seed)
+    engine = SimulationEngine(simulation, storage, seed=seed, progress_callback=progress_callback)
     engine.speed_multiplier = speed
     if max_failures is not None:
         engine._max_failures = max_failures
@@ -155,7 +172,8 @@ def run_simulation(
     seed: Optional[int] = None,
     max_failures: Optional[int] = None,
     headless: bool = True,
-    on_tick: Optional[Any] = None # Callback (optional)
+    on_tick: Optional[Any] = None, # Deprecated - use progress_callback instead
+    progress_callback: Optional[ProgressCallback] = None
 ) -> Dict[str, Any]:
     """Run a simulation for a specified duration."""
     engine = setup_simulation_engine(
@@ -165,7 +183,8 @@ def run_simulation(
         resume=resume,
         cache=cache,
         seed=seed,
-        max_failures=max_failures
+        max_failures=max_failures,
+        progress_callback=progress_callback
     )
     
     try:

@@ -6,7 +6,24 @@ authors = [
     {name = "gongahkia"}
 ]
 readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.11,<4.0"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Office/Business",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Homepage = "https://github.com/gongahkia/why-combinator"
+Repository = "https://github.com/gongahkia/why-combinator"
+Issues = "https://github.com/gongahkia/why-combinator/issues"
+
 dependencies = [
     "typer (>=0.21.1,<0.22.0)",
     "rich (>=14.3.2,<15.0.0)",
@@ -21,6 +38,10 @@ dev = ["pytest>=7.0.0"]
 
 [project.scripts]
 why-combinator = "why_combinator.cli:app"
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
 
 [tool.poetry]
 packages = [{include = "why_combinator", from = "src"}]

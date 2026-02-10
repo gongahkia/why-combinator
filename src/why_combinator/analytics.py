@@ -250,10 +250,10 @@ class CustomMetricBuilder:
     def calculate_all(self, metrics: Dict[str, float]) -> Dict[str, float]:
         return {name: self.calculate(name, metrics) for name in self.definitions}
 
-def export_json(data: Dict[str, Any], path: Path):
+def export_json(data: Dict[str, Any], path: Path) -> None:
     path.write_text(json.dumps(data, indent=2, default=str))
 
-def export_csv(rows: List[Dict[str, Any]], path: Path):
+def export_csv(rows: List[Dict[str, Any]], path: Path) -> None:
     if not rows:
         return
     with open(path, "w", newline="") as f:
