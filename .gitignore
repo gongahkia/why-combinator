@@ -33,4 +33,4 @@ data/*.json
 simulations/*.json
 
 # Poetry
-poetry.lock
+# poetry.lock
