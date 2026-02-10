@@ -6,8 +6,37 @@ import random
 import io
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
-from why_combinator.models import SimulationEntity, InteractionLog, MetricSnapshot
+from why_combinator.models import SimulationEntity, InteractionLog, MetricSnapshot, ExperimentConfig
 from why_combinator.storage import StorageManager
+
+def diff_experiments(config1: ExperimentConfig, config2: ExperimentConfig) -> Dict[str, Any]:
+    """Compare two experiment configurations and identify changes."""
+    c1 = config1.to_dict()
+    c2 = config2.to_dict()
+    
+    diff = {}
+    all_keys = set(c1.keys()) | set(c2.keys())
+    
+    for key in all_keys:
+        val1 = c1.get(key)
+        val2 = c2.get(key)
+        
+        if val1 != val2:
+            # Recurse for nested dicts (from nested dataclasses)
+            if isinstance(val1, dict) and isinstance(val2, dict):
+                sub_diff = {}
+                sub_keys = set(val1.keys()) | set(val2.keys())
+                for sk in sub_keys:
+                    sv1 = val1.get(sk)
+                    sv2 = val2.get(sk)
+                    if sv1 != sv2:
+                        sub_diff[sk] = {"old": sv1, "new": sv2}
+                if sub_diff:
+                    diff[key] = sub_diff
+            else:
+                diff[key] = {"old": val1, "new": val2}
+                
+    return diff
 
 class ScenarioBranch:
     """Represents a what-if scenario branch from a simulation."""
