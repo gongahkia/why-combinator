@@ -1,5 +1,6 @@
 """Procedural data generation for simulation outputs."""
 import random
+import math
 import time
 from typing import Dict, Any, List
 from why_combinator.models import SimulationEntity, MetricSnapshot, InteractionLog
@@ -132,9 +133,24 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
     total_agents = max(len(set(i.agent_id for i in interactions)), 1)
     total = len(interactions) or 1
 
-    # Adoption: cumulative positive actions relative to total agents and ticks
-    positive_count = sum(1 for i in interactions if i.action in positive_actions)
-    adoption_rate = min(positive_count / (total_agents * max(tick_count, 1)) * 5, 1.0)
+    # Adoption: Logistic S-Curve model
+    # Model: P(t) = 1 / (1 + exp(-k * (t - t0)))
+    params = simulation.parameters
+    viral_coeff = params.get("viral_coefficient", 0.1)
+    conv_rate = params.get("conversion_rate", 0.05)
+    
+    # k denotes the growth rate (steepness)
+    # We combine viral coefficient and conversion rate to derive k
+    k = (viral_coeff * 0.5) + (conv_rate * 2.0)
+    
+    # t0 is the inflection point (ticks to 50% adoption)
+    t0 = params.get("inflection_tick", 100)
+    
+    try:
+        adoption_rate = 1.0 / (1.0 + math.exp(-k * (tick_count - t0)))
+    except OverflowError:
+        # constant high or low
+        adoption_rate = 0.0 if (tick_count - t0) < 0 else 1.0
 
     # Churn: agents who previously did positive actions but switched to negative
     agent_actions: Dict[str, List[str]] = {}
