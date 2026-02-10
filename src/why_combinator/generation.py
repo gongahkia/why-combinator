@@ -186,8 +186,34 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
             
         churn_rate = 1.0 - (expected_active_sum / len(agent_start_times)) if agent_start_times else 0.0
 
-    # Market share: from competitive market results if available, else behavioral
-    market_share = min(positive_count / (total * 2), 0.5)
+    # Market share: Relative Product Quality vs Competitors
+    # Share = Q_me / (Q_me + Sum(Q_comp))
+    
+    # Calculate My Quality Score based on interaction sentiment proxy
+    # We define quality as ratio of positive to negative interactions
+    positive_interactions = sum(1 for i in interactions if i.action in positive_actions)
+    negative_interactions = sum(1 for i in interactions if i.action in negative_actions)
+    total_relevant = positive_interactions + negative_interactions
+    
+    if total_relevant > 0:
+        my_quality_score = positive_interactions / total_relevant
+    else:
+        my_quality_score = 0.5 # Neutral baseline
+        
+    # Competitor parameters
+    competitor_count = params.get("competitor_count", 3)
+    competitor_quality_avg = params.get("competitor_quality_avg", 0.5)
+    
+    # Market Share formula
+    if competitor_count == 0:
+         market_share = my_quality_score # Monopoly modulated by quality?? Or 1.0?
+         # If monopoly, share is 1.0 of the addressable market captured so far?
+         # But "Market Share" usually implies relative to competition.
+         # We'll use 1.0 if no competitors, but usually market share <= 1.0
+         market_share = 1.0
+    else:
+         total_quality_pool = my_quality_score + (competitor_count * competitor_quality_avg)
+         market_share = my_quality_score / total_quality_pool if total_quality_pool > 0 else 0.0
 
     # Revenue: buy-action count in last 30 ticks * price-per-unit
     price_per_unit = simulation.parameters.get("price_per_unit", 100.0)
