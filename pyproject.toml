@@ -6,7 +6,7 @@ authors = [
     {name = "gongahkia"}
 ]
 readme = "README.md"
-requires-python = "^3.11"
+requires-python = ">=3.11"
 dependencies = [
     "typer (>=0.21.1,<0.22.0)",
     "rich (>=14.3.2,<15.0.0)",
@@ -14,13 +14,11 @@ dependencies = [
     "httpx (>=0.28.1,<0.29.0)"
 ]
 
-
-[tool.poetry.scripts]
+[project.scripts]
 sim-city = "sim_city.cli:app"
 
-[tool.poetry.packages]
-include = "sim_city"
-from = "src"
+[tool.poetry]
+packages = [{include = "sim_city", from = "src"}]
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
