@@ -212,6 +212,11 @@ class SimulationEngine:
                         debate = DebateSession(topic=f"Market direction for {self.simulation.industry}", context=f"Stage: {self.simulation.stage.value}", llm_provider=self._llm_provider, rounds=2)
                         debate.run([agent] + rival_agents)
                     break  # one debate per tick cycle
+        
+        # Apply relationship decay
+        decay = self.simulation.parameters.get("relationship_decay_factor", 0.995)
+        self.relationships.tick(decay)
+        
         if self.tick_count % 100 == 0:
             self.checkpoint()
     def checkpoint(self):

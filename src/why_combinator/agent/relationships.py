@@ -48,3 +48,11 @@ class RelationshipGraph:
         return self._edges
     def from_dict(self, data: Dict):
         self._edges = data
+        
+    def tick(self, decay_factor: float = 0.995):
+        """Apply temporal decay to relationship strengths."""
+        for targets in self._edges.values():
+            for edge in targets.values():
+                edge["strength"] *= decay_factor
+                if abs(edge["strength"]) < 0.01:
+                    edge["strength"] = 0.0
