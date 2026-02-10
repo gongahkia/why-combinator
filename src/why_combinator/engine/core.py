@@ -101,7 +101,7 @@ class SimulationEngine:
             signal.signal(signal.SIGINT, self._orig_sigint)
         if self._orig_sigterm:
             signal.signal(signal.SIGTERM, self._orig_sigterm)
-    def spawn_agent(self, agent: BaseAgent):
+    def spawn_agent(self, agent: BaseAgent) -> None:
         self.agents.append(agent)
         self.storage.save_agent(self.simulation.id, agent.entity)
         self.event_bus.publish("agent_created", agent.entity.to_dict(), self.current_time)
@@ -112,31 +112,31 @@ class SimulationEngine:
             self._agent_pool = AgentPool(max_active=20)
             for a in self.agents:
                 self._agent_pool.add(a)
-    def start(self):
+    def start(self) -> None:
         if self.is_running:
             return
         self.is_running = True
         self.is_paused = False
         logger.info(f"Simulation {self.simulation.id} started.")
         self.event_bus.publish("simulation_started", {"id": self.simulation.id}, self.current_time)
-    def stop(self):
+    def stop(self) -> None:
         self.is_running = False
         self.is_paused = False
         self._batch_writer.flush()
         logger.info(f"Simulation {self.simulation.id} stopped.")
         self.event_bus.publish("simulation_stopped", {"id": self.simulation.id}, self.current_time)
-    def pause(self):
+    def pause(self) -> None:
         if self.is_running and not self.is_paused:
             self.is_paused = True
             logger.info(f"Simulation {self.simulation.id} paused at tick {self.tick_count}.")
             self.event_bus.publish("simulation_paused", {"id": self.simulation.id, "tick": self.tick_count}, self.current_time)
-    def resume(self):
+    def resume(self) -> None:
         if self.is_running and self.is_paused:
             self.is_paused = False
             self._sigint_count = 0 # reset so next ctrl-c pauses again
             logger.info(f"Simulation {self.simulation.id} resumed.")
             self.event_bus.publish("simulation_resumed", {"id": self.simulation.id, "tick": self.tick_count}, self.current_time)
-    def step(self, duration: float = 1.0):
+    def step(self, duration: float = 1.0) -> None:
         if not self.is_running or self.is_paused:
             return
         self.tick_count += 1
@@ -240,7 +240,7 @@ class SimulationEngine:
         
         if self.tick_count % 100 == 0:
             self.checkpoint()
-    def checkpoint(self):
+    def checkpoint(self) -> None:
         self.simulation.parameters["current_time"] = self.current_time
         self.simulation.parameters["tick_count"] = self.tick_count
         self.simulation.parameters["agent_memories"] = {a.entity.id: a.memory[-20:] for a in self.agents}
@@ -254,7 +254,7 @@ class SimulationEngine:
         meta.insert(self.simulation.to_dict())
         db.close()
         logger.info(f"Checkpoint saved at tick {self.tick_count}")
-    def restore_from_checkpoint(self):
+    def restore_from_checkpoint(self) -> bool:
         """Restore engine state from last checkpoint if available."""
         params = self.simulation.parameters
         if "current_time" in params:
@@ -280,7 +280,7 @@ class SimulationEngine:
             logger.info(f"Restored from checkpoint at tick {self.tick_count}")
             return True
         return False
-    def _emit_metrics(self):
+    def _emit_metrics(self) -> None:
         """Calculate and emit current metrics with seasonal multipliers using cached interactions."""
         # Flush batch writer to ensure all interactions are persisted
         self._batch_writer.flush()
@@ -311,7 +311,7 @@ class SimulationEngine:
         interactions = self._cached_interactions or self.storage.get_interactions(self.simulation.id)
         metrics = getattr(self, "_latest_metrics", calculate_basic_metrics(self.simulation, interactions, self.tick_count))
         return generate_critique_report(self.simulation, interactions, metrics)
-    def run_loop(self, max_ticks: Optional[int] = None):
+    def run_loop(self, max_ticks: Optional[int] = None) -> None:
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
         self.start()
@@ -392,9 +392,15 @@ class BatchRunner:
             
             for agent_entity in agents:
                 # Create agent instance
-                # Note: GenericAgent uses `world_state` reference.
-                agent_impl = GenericAgent(agent_entity, engine.event_bus, llm, engine.world_state)
-                engine.register_agent(agent_impl)
+                world_context = {
+                    "id": sim_entity.id,
+                    "name": sim_entity.name,
+                    "description": sim_entity.description,
+                    "industry": sim_entity.industry,
+                    "stage": sim_entity.stage.value
+                }
+                agent_impl = GenericAgent(agent_entity, engine.event_bus, llm, world_context)
+                engine.spawn_agent(agent_impl) # Was engine.register_agent which is not defined? engine has spawn_agent.
                 
             # Execution Loop (Headless)
             try:
