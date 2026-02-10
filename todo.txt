@@ -3,8 +3,6 @@ Tech Stack: Python CLI (Typer/Rich), TinyDB/JSON, Ollama/Huggingface/LLM APIs, D
 Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization
 ================================================================================
 
---- PHASE 3: FULL FEATURE SET (stretch goals, preserved from original) ---
-
 # Stretch Goals: Web UI & PostgreSQL
 (STRETCH) Implement PostgreSQL storage backend as alternative to TinyDB
 (STRETCH) Create database migration scripts from TinyDB to PostgreSQL
