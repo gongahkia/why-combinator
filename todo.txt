@@ -4,10 +4,7 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 ================================================================================
 
 # DX/Utility: Library API, PyPI, CLI
-(B) Refactor cli.py to be a thin wrapper: move all business logic from CLI command handlers into engine/ or a new src/why_combinator/api.py module +refactor
-(B) Create src/why_combinator/api.py with public functions: create_simulation(), run_simulation(), list_simulations(), get_metrics(), export_simulation() callable without Typer +refactor +feature
-(B) Create src/why_combinator/__init__.py that explicitly exports public API surface: SimulationEngine, create_simulation, run_simulation, LLMFactory, StorageManager +refactor
-(B) Add py.typed marker file at src/why_combinator/py.typed for PEP 561 type stub support +infra
+
 (B) Add full return type annotations to all public methods in engine/core.py (step, start, stop, checkpoint, restore) +refactor
 (B) Add full type annotations to all public methods in agent/impl.py (perceive, reason, act, run_step) replacing Dict[str,Any] with typed dataclasses +refactor
 (B) Add full type annotations to analytics.py and analytics_advanced.py public functions +refactor
