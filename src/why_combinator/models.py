@@ -31,6 +31,52 @@ class SimulationStage(str, Enum):
 
 
 @dataclass
+class UnitEconomics:
+    cac: float
+    gross_margin: float
+    opex_ratio: float
+    base_opex: float
+    price_per_unit: float
+
+@dataclass
+class MarketParams:
+    tam: float = 10000.0
+    viral_coefficient: float = 0.1
+    conversion_rate: float = 0.05
+    competitor_count: int = 3
+    competitor_quality_avg: float = 0.5
+    retention_half_life: float = 200.0
+    inflection_tick: int = 100
+    revenue_model: str = "transactional"
+    investor_burn_limit: float = 15.0
+
+@dataclass
+class FundingState:
+    initial_capital: float
+    revenue_growth_rate: float = 0.05
+    burn_growth_rate: float = 0.02
+
+
+@dataclass
+class ExperimentConfig:
+    """Typed configuration for reproducible simulation experiments."""
+    simulation_name: str
+    industry: str
+    stage: SimulationStage
+    agent_count: int
+    market_params: MarketParams
+    unit_economics: UnitEconomics
+    funding_state: FundingState
+    llm_model: str
+    seed: Optional[int] = None
+    duration_ticks: int = 1000
+    description: str = ""
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class AgentEntity:
     """Represents an AI agent in the simulation."""
     id: str

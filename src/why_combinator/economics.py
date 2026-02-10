@@ -2,31 +2,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Union, Dict
 import math
 import time
-from why_combinator.models import InteractionLog
-
-@dataclass
-class UnitEconomics:
-    cac: float
-    gross_margin: float
-    opex_ratio: float
-    base_opex: float
-    price_per_unit: float
-
-@dataclass
-class MarketParams:
-    tam: float = 10000.0
-    viral_coefficient: float = 0.1
-    conversion_rate: float = 0.05
-    competitor_count: int = 3
-    competitor_quality_avg: float = 0.5
-    retention_half_life: float = 200.0
-    inflection_tick: int = 100
-
-@dataclass
-class FundingState:
-    initial_capital: float
-    revenue_growth_rate: float = 0.05
-    burn_growth_rate: float = 0.02
+from why_combinator.models import InteractionLog, MarketParams, UnitEconomics, FundingState
 
 def calculate_adoption_rate(params: MarketParams, tick_count: int) -> float:
     """Calculate adoption rate using logistic S-curve."""
