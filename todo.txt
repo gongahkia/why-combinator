@@ -16,7 +16,7 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 
 
-(B) Add agent behavioral invariant assertions in agent/base.py: configurable rules (e.g., cannot invest with 0 capital) that raise on violation during simulation +reproducibility +security
+
 
 # DX/Utility: Library API, PyPI, CLI
 (B) Refactor cli.py to be a thin wrapper: move all business logic from CLI command handlers into engine/ or a new src/why_combinator/api.py module +refactor
