@@ -151,24 +151,44 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
     # Market share: from competitive market results if available, else behavioral
     market_share = min(positive_count / (total * 2), 0.5)
 
-    # Burn rate: influenced by employee actions and stage
-    stage_burn = {"idea": 10000, "mvp": 30000, "launch": 60000, "growth": 100000, "scale": 200000}
-    base_burn = stage_burn.get(simulation.stage.value, 50000)
-    employee_actions = [i for i in interactions if i.action in ("complain", "wait") and "employee" in str(i.outcome).lower()]
-    morale_factor = 1.0 + len(employee_actions) * 0.01  # low morale increases burn
-    burn_rate = base_burn * morale_factor
-
-    # Revenue: buy-action count * price-per-unit
+    # Revenue: buy-action count in last 30 ticks * price-per-unit
     price_per_unit = simulation.parameters.get("price_per_unit", 100.0)
-    buy_count = sum(1 for i in interactions if i.action == "buy")
-    revenue = buy_count * price_per_unit
+    month_window = 30
+    
+    # Calculate Monthly Metrics (implied last 30 ticks)
+    # We use a simple average rate based on total tick count due to lack of tick history in InteractionLog
+    buy_count_total = sum(1 for i in interactions if i.action == "buy")
+    monthly_revenue = (buy_count_total / max(tick_count, 1)) * 30 * price_per_unit
+    monthly_new_customers = (buy_count_total / max(tick_count, 1)) * 30
+    
+    # Burn Rate Calculation (Unit Economics)
+    params = simulation.parameters
+    cac = params.get("cac", 50.0)
+    gross_margin = params.get("gross_margin", 0.7)
+    opex_ratio = params.get("opex_ratio", 0.5) # Opex as % of Revenue
+    base_opex = params.get("base_opex", 5000.0) # Fixed monthly cost
+    
+    cogs = monthly_revenue * (1 - gross_margin)
+    marketing_spend = monthly_new_customers * cac
+    variable_opex = monthly_revenue * opex_ratio
+    
+    burn_rate = base_opex + cogs + marketing_spend + variable_opex
+    
+    # Adjust for morale
+    employee_actions = [i for i in interactions if i.action in ("complain", "wait") and "employee" in str(i.outcome).lower()]
+    morale_factor = 1.0 + len(employee_actions) * 0.001 
+    burn_rate *= morale_factor
 
-    # Runway: (initial_capital - cumulative_burn) / monthly_burn_rate
-    initial_capital = simulation.parameters.get("initial_capital", 500000)
-    months_elapsed = max(tick_count / 30, 1)  # ~30 ticks per month
+    revenue = buy_count_total * price_per_unit
+    
+    # Runway calculation
+    initial_capital = params.get("initial_capital", 500000)
+    months_elapsed = max(tick_count / 30, 1)
+    # Approximate cumulative burn
     cumulative_burn = burn_rate * months_elapsed
+    
     monthly_burn = burn_rate if burn_rate > 0 else 1
-    runway_months = max((initial_capital - cumulative_burn) / monthly_burn, 0)
+    runway_months = max((initial_capital - cumulative_burn + revenue) / monthly_burn, 0)
 
     return {
         "adoption_rate": round(adoption_rate, 4),
