@@ -8,6 +8,14 @@ from why_combinator.models import SimulationEntity, SimulationRun, InteractionLo
 from why_combinator.events import EventBus
 from why_combinator.agent.base import BaseAgent
 from why_combinator.storage import StorageManager
+from why_combinator.models import SimulationEntity, MetricSnapshot, ExperimentConfig
+from why_combinator.llm.factory import LLMFactory
+from why_combinator.llm.cache import CachedLLMProvider
+from why_combinator.agent.impl import GenericAgent
+from why_combinator.engine.spawner import generate_initial_agents
+from dataclasses import asdict
+import random
+import uuid
 from why_combinator.generation import calculate_basic_metrics, generate_critique_report
 from why_combinator.agent.relationships import RelationshipGraph
 from why_combinator.agent.emergence import EmergenceDetector
@@ -291,3 +299,79 @@ class SimulationEngine:
             self._restore_signal_handlers()
             if self.is_running:
                 self.stop()
+
+class BatchRunner:
+    """Orchestrates multiple simulation runs for experiments."""
+    def __init__(self, config: ExperimentConfig, num_runs: int, storage: StorageManager):
+        self.config = config
+        self.num_runs = num_runs
+        self.storage = storage
+        
+    def run(self):
+        """Execute the batch of simulations."""
+        base_seed = self.config.seed or random.randint(0, 100000)
+        
+        for i in range(self.num_runs):
+            # Deterministic variation of seed per run
+            current_seed = base_seed + i
+            logger.info(f"Running batch simulation {i+1}/{self.num_runs} with seed {current_seed}")
+            
+            # Flatten experiment config into valid simulation parameters
+            flat_params = {}
+            # Base simulation params
+            flat_params.update(asdict(self.config.market_params))
+            flat_params.update(asdict(self.config.unit_economics))
+            flat_params.update(asdict(self.config.funding_state))
+            # Extras
+            flat_params["agent_count"] = self.config.agent_count
+            flat_params["seed"] = current_seed
+            flat_params["experiment_name"] = self.config.simulation_name
+            flat_params["batch_run_index"] = i
+            
+            sim_id = str(uuid.uuid4())
+            sim_entity = SimulationEntity(
+                id=sim_id,
+                name=f"{self.config.simulation_name}_run_{i+1}",
+                description=self.config.description,
+                industry=self.config.industry,
+                stage=self.config.stage,
+                parameters=flat_params,
+                created_at=time.time()
+            )
+            
+            self.storage.save_simulation(sim_entity)
+            
+            # Initialize engine with deterministic seed
+            engine = SimulationEngine(sim_entity, self.storage, seed=current_seed)
+            engine.start() # Set state to running
+            
+            # Setup LLM with caching for reproducibility
+            llm = LLMFactory.create(self.config.llm_model)
+
+            # Wrapper logic for caching if needed (engine handles seed/caching internally via passed params? No, CLI handled it)
+            # We must handle it here.
+            # If seed set, use cache.
+            llm = CachedLLMProvider(llm)
+                
+            # Populate Agents
+            agents = generate_initial_agents(sim_entity)
+            
+            for agent_entity in agents:
+                # Create agent instance
+                # Note: GenericAgent uses `world_state` reference.
+                agent_impl = GenericAgent(agent_entity, engine.event_bus, llm, engine.world_state)
+                engine.register_agent(agent_impl)
+                
+            # Execution Loop (Headless)
+            try:
+                # Run max ticks with step
+                for tick in range(self.config.duration_ticks):
+                    if not engine.is_running:
+                        break
+                    engine.step()
+            except Exception as e:
+                logger.error(f"Batch run {i+1} failed: {e}")
+            finally:
+                engine.stop()
+                
+            logger.info(f"Batch run {i+1} completed.")
