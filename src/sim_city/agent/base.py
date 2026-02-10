@@ -13,6 +13,21 @@ class BaseAgent(ABC):
         self.event_bus = event_bus
         self.memory: List[Dict[str, Any]] = []
 
+    def add_memory(self, content: str, role: str = "observation", timestamp: float = 0.0):
+        """Add a memory item."""
+        self.memory.append({
+            "content": content,
+            "role": role,
+            "timestamp": timestamp
+        })
+    
+    def get_recent_memories(self, limit: int = 5) -> str:
+        """Get recent memories as a formatted string."""
+        return "\n".join(
+            f"[{m['role']}] {m['content']}" 
+            for m in self.memory[-limit:]
+        )
+
     @abstractmethod
     def perceive(self, world_state: Dict[str, Any]) -> Dict[str, Any]:
         """Gather information from the world."""
