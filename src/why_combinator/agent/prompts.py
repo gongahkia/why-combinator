@@ -80,3 +80,20 @@ MEMORIES:
 
 Provide only the summary, no additional commentary.
 """
+
+# JSON schema for agent decision responses
+AGENT_RESPONSE_SCHEMA = """
+REQUIRED JSON STRUCTURE:
+{
+    "thought_process": "string - Your internal reasoning about the situation",
+    "action_type": "string - The action to take (e.g., 'buy', 'invest', 'wait', 'review', 'message')",
+    "confidence": "number - Your confidence in this decision (0.0 to 1.0)",
+    "action_details": {
+        "target": "string - The target of your action (agent ID, product name, or 'system')",
+        "content": "string - The content of your action (optional)",
+        "parameters": "object - Additional parameters (optional)"
+    }
+}
+
+CRITICAL: You MUST return valid JSON matching this exact structure. Missing required fields will cause errors.
+"""

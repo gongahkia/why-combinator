@@ -143,6 +143,31 @@ class SimulationEntity:
     parameters: Dict[str, Any]  # e.g., market_size, initial_capital
     created_at: float
     
+        def __post_init__(self):
+            """Validate simulation entity fields for security and data integrity."""
+            # Validate stage is a valid SimulationStage
+            if isinstance(self.stage, str):
+                try:
+                    self.stage = SimulationStage(self.stage)
+                except ValueError:
+                    raise ValueError(f"Invalid stage '{self.stage}'. Must be one of: {[s.value for s in SimulationStage]}")
+            elif not isinstance(self.stage, SimulationStage):
+                raise TypeError(f"Stage must be SimulationStage enum or valid string, got {type(self.stage)}")
+        
+            # Validate industry is non-empty
+            if not self.industry or not self.industry.strip():
+                raise ValueError("Industry field cannot be empty")
+        
+            # Validate name length (1-100 characters)
+            if not self.name:
+                raise ValueError("Simulation name cannot be empty")
+            if len(self.name) > 100:
+                raise ValueError(f"Simulation name too long ({len(self.name)} chars). Maximum 100 characters.")
+        
+            # Validate parameters is a dictionary
+            if not isinstance(self.parameters, dict):
+                raise TypeError(f"Parameters must be a dictionary, got {type(self.parameters)}")
+    
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
