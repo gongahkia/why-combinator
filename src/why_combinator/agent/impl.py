@@ -131,9 +131,26 @@ class GenericAgent(BaseAgent):
         full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}{difficulty_str}{sentiment_str}\n{prompt}"
         response_text = await self.llm_provider.async_completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
         decision = extract_json(response_text)
-        if not decision:
-            logger.warning(f"Agent {self.entity.id} produced invalid JSON: {response_text[:100]}...")
-            decision = {"thought_process": "I am confused and will do nothing.", "action_type": "wait", "action_details": {}}
+        required_keys = ("action_type", "thought_process")
+        missing_keys = [k for k in required_keys if not (isinstance(decision, dict) and decision.get(k))]
+        if not decision or missing_keys:
+            logger.warning(f"Agent {self.entity.id} produced invalid response. Missing keys: {missing_keys or 'unknown'}")
+            schema_reminder = (
+                "Return valid JSON with required keys: thought_process, action_type, action_details. "
+                "Do not include any extra text outside the JSON object."
+            )
+            retry_prompt = f"{full_prompt}\n\nSCHEMA REMINDER:\n{schema_reminder}"
+            retry_text = await self.llm_provider.async_completion(
+                prompt=retry_prompt,
+                system_prompt="You are a role-playing agent in a business simulation. Follow the JSON schema exactly."
+            )
+            retry_decision = extract_json(retry_text)
+            retry_missing = [k for k in required_keys if not (isinstance(retry_decision, dict) and retry_decision.get(k))]
+            if retry_decision and not retry_missing:
+                decision = retry_decision
+            else:
+                logger.warning(f"Agent {self.entity.id} retry failed; falling back to wait action")
+                decision = {"thought_process": "I am confused and will do nothing.", "action_type": "wait", "action_details": {}}
         self.add_memory(f"Thought: {decision.get('thought_process', '')}", role="internal")
         if decision.get("new_goal"): # LLM can set goals
             self.set_goal(decision["new_goal"], priority=decision.get("goal_priority", 0.5))
