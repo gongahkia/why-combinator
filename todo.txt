@@ -8,7 +8,7 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 
 
-(B) Add customer agent behavior rule: churn probability increases when product_quality metric drops below satisfaction threshold +economics +feature
+
 (B) Create typed ExperimentConfig dataclass in models.py with all simulation control variables (agent_count, market_params, llm_spec, seed, duration) replacing loose dict params +reproducibility
 (B) Add experiment diffing utility in analytics.py that compares two ExperimentConfig objects and outputs which variables changed between runs +reproducibility
 (B) Implement batch runner in engine/core.py: run N simulations with same config but different seeds, collecting results for statistical analysis +reproducibility +feature
