@@ -62,11 +62,23 @@ class BatchWriter:
         self.flush_interval = flush_interval
         self._buffer: List[InteractionLog] = []
         self._last_flush = time.time()
+        self._lock = threading.Lock()
+
     def add(self, log: InteractionLog):
-        self._buffer.append(log)
-        if len(self._buffer) >= self.batch_size or (time.time() - self._last_flush) >= self.flush_interval:
-            self.flush()
+        with self._lock:
+            self._buffer.append(log)
+            if len(self._buffer) >= self.batch_size or (time.time() - self._last_flush) >= self.flush_interval:
+                self._flush_internal()
+
     def flush(self):
+        with self._lock:
+            self._flush_internal()
+
+    def _flush_internal(self):
+        """Internal flush method. Assumes lock is held."""
+        if not self._buffer:
+            return
+            
         for log in self._buffer:
             self.storage.log_interaction(log)
         self._buffer.clear()
