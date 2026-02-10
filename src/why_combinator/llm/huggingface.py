@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from typing import List, Dict, Optional, Any
 from why_combinator.llm.base import LLMProvider
 from why_combinator.config import HUGGINGFACE_API_KEY
@@ -57,3 +58,28 @@ class HuggingfaceProvider(LLMProvider):
         user_msgs = [m["content"] for m in messages if m["role"] == "user"]
         prompt = "\n".join(user_msgs)
         return self.completion(prompt, system_prompt=system, **kwargs)
+
+    async def async_completion(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
+        full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+        if self._local_pipeline:
+            # Run local pipeline in thread pool
+            return await asyncio.to_thread(self.completion, prompt, system_prompt, **kwargs)
+        if self.api_key:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    response = await client.post(
+                        f"https://api-inference.huggingface.co/models/{self.model}",
+                        headers={"Authorization": f"Bearer {self.api_key}"},
+                        json={"inputs": full_prompt, "parameters": {"max_new_tokens": kwargs.get("max_tokens", 512), "temperature": kwargs.get("temperature", 0.7)}}
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    if isinstance(data, list) and data:
+                        return data[0].get("generated_text", "")[len(full_prompt):].strip()
+                    return ""
+            except Exception as e:
+                logger.error(f"HF API async inference failed: {e}")
+                return ""
+        logger.error("No HF API key and local transformers unavailable.")
+        return ""

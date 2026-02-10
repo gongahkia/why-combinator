@@ -63,7 +63,7 @@ class GenericAgent(BaseAgent):
                 "product_quality": m.get("product_quality", "Unknown")
             }
         return perception
-    def reason(self, perception: Dict[str, Any]) -> InteractionOutcome:
+    async def reason(self, perception: Dict[str, Any]) -> InteractionOutcome:
         sim_context_str = SIMULATION_CONTEXT.format(
             industry=self.world_context.get("industry", "Unknown"),
             stage=self.world_context.get("stage", "Unknown"),
@@ -107,7 +107,7 @@ class GenericAgent(BaseAgent):
             else:
                 sentiment_str = "\nMARKET SENTIMENT: The market sentiment is NEUTRAL/STABLE.\n"
         full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}{difficulty_str}{sentiment_str}\n{prompt}"
-        response_text = self.llm_provider.completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
+        response_text = await self.llm_provider.async_completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
         decision = extract_json(response_text)
         if not decision:
             logger.warning(f"Agent {self.entity.id} produced invalid JSON: {response_text[:100]}...")

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional, Callable, Tuple
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +66,12 @@ class BaseAgent(ABC):
     def perceive(self, world_state: WorldState) -> Dict[str, Any]:
         pass
     @abstractmethod
-    def reason(self, perception: Dict[str, Any]) -> InteractionOutcome:
+    async def reason(self, perception: Dict[str, Any]) -> InteractionOutcome:
         pass
     @abstractmethod
     def act(self, decision: InteractionOutcome) -> InteractionLog:
         pass
-    def run_step(self, world_state: WorldState, timestamp: float) -> Optional[InteractionLog]:
+    async def run_step(self, world_state: WorldState, timestamp: float) -> Optional[InteractionLog]:
         self._steps_taken += 1
         if self._steps_taken % 20 == 0:
             self.difficulty = min(3.0, self.difficulty + 0.1)
@@ -82,7 +83,7 @@ class BaseAgent(ABC):
                 summary = f"Reflection: Over my last {len(actions)} decisions, my focus has been on {actions[-1][:60] if actions else 'various activities'}."
                 self.memory.insert(0, {"content": summary, "role": "reflection", "timestamp": timestamp})
         perception = self.perceive(world_state)
-        decision = self.reason(perception)
+        decision = await self.reason(perception)
         interaction = self.act(decision)
         if interaction:
             # Check invariants

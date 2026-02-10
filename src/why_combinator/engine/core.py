@@ -2,6 +2,7 @@ from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 import time
 import signal
 import threading
+import asyncio
 from datetime import datetime
 import logging
 from why_combinator.models import SimulationEntity, SimulationRun, InteractionLog, MetricSnapshot, WorldState
@@ -84,6 +85,8 @@ class SimulationEngine:
         self._consecutive_failures = 0
         self._orig_sigint = None
         self._orig_sigterm = None
+        self._max_concurrent = simulation.parameters.get("max_concurrent", 10)
+        self._semaphore = asyncio.Semaphore(self._max_concurrent)
     def _install_signal_handlers(self) -> None:
         """Install signal handlers for graceful pause/stop."""
         self._orig_sigint = signal.getsignal(signal.SIGINT)
@@ -140,7 +143,21 @@ class SimulationEngine:
             self._sigint_count = 0 # reset so next ctrl-c pauses again
             logger.info(f"Simulation {self.simulation.id} resumed.")
             self.event_bus.publish("simulation_resumed", {"id": self.simulation.id, "tick": self.tick_count}, self.current_time)
-    def step(self, duration: float = 1.0) -> None:
+    
+    async def _run_agent_step(self, agent: BaseAgent, world_state: WorldState, current_time: float) -> Optional[InteractionLog]:
+        """Run a single agent step with semaphore limiting concurrency."""
+        async with self._semaphore:
+            import time as time_module
+            step_start = time_module.time()
+            try:
+                interaction = await agent.run_step(world_state, current_time)
+                step_duration_ms = (time_module.time() - step_start) * 1000
+                return interaction, step_duration_ms, None
+            except Exception as e:
+                step_duration_ms = (time_module.time() - step_start) * 1000
+                return None, step_duration_ms, e
+    
+    async def step(self, duration: float = 1.0) -> None:
         if not self.is_running or self.is_paused:
             return
         self.tick_count += 1
@@ -182,16 +199,15 @@ class SimulationEngine:
         active_agents = self._agent_pool.get_active() if self._agent_pool else self.agents
         if self._agent_pool:
             self._agent_pool.rotate()
-        for agent in active_agents:
-            import time as time_module
-            step_start = time_module.time()
-            try:
-                interaction = agent.run_step(self.world_state, self.current_time)
-                step_duration_ms = (time_module.time() - step_start) * 1000
-            except Exception as e:
-                step_duration_ms = (time_module.time() - step_start) * 1000
+        
+        # Run all agent steps concurrently with semaphore limiting
+        tasks = [self._run_agent_step(agent, self.world_state, self.current_time) for agent in active_agents]
+        results = await asyncio.gather(*tasks)
+        
+        for agent, (interaction, step_duration_ms, error) in zip(active_agents, results):
+            if error:
                 logger.error(
-                    f"Agent {agent.entity.id} step failed: {e}",
+                    f"Agent {agent.entity.id} step failed: {error}",
                     extra={
                         "simulation_id": self.simulation.id,
                         "tick": self.tick_count,
@@ -363,7 +379,7 @@ class SimulationEngine:
                     time.sleep(0.1) # spin-wait while paused
                     continue
                 start_real = time.time()
-                self.step()
+                asyncio.run(self.step())
                 if max_ticks and self.tick_count >= max_ticks:
                     self.stop()
                     break
@@ -450,7 +466,7 @@ class BatchRunner:
                 for tick in range(self.config.duration_ticks):
                     if not engine.is_running:
                         break
-                    engine.step()
+                    asyncio.run(engine.step())
             except Exception as e:
                 logger.error(f"Batch run {i+1} failed: {e}")
             finally:
