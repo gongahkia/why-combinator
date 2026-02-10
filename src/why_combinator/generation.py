@@ -215,15 +215,58 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
          total_quality_pool = my_quality_score + (competitor_count * competitor_quality_avg)
          market_share = my_quality_score / total_quality_pool if total_quality_pool > 0 else 0.0
 
-    # Revenue: buy-action count in last 30 ticks * price-per-unit
-    price_per_unit = simulation.parameters.get("price_per_unit", 100.0)
+    # Revenue Model
+    # Supports: transactional (one-off), subscription (recurring), freemium (recurring)
+    revenue_model = params.get("revenue_model", "transactional") 
+    price_per_unit = params.get("price_per_unit", 100.0)
     month_window = 30
     
-    # Calculate Monthly Metrics (implied last 30 ticks)
-    # We use a simple average rate based on total tick count due to lack of tick history in InteractionLog
-    buy_count_total = sum(1 for i in interactions if i.action == "buy")
-    monthly_revenue = (buy_count_total / max(tick_count, 1)) * 30 * price_per_unit
+    buy_interactions = [i for i in interactions if i.action == "buy"]
+    buy_count_total = len(buy_interactions)
+    
+    # Monthly New Customers (Rate approximation)
     monthly_new_customers = (buy_count_total / max(tick_count, 1)) * 30
+    
+    monthly_revenue = 0.0
+    cumulative_revenue = 0.0
+    
+    if revenue_model == "transactional":
+        cumulative_revenue = buy_count_total * price_per_unit
+        monthly_revenue = monthly_new_customers * price_per_unit
+        
+    elif revenue_model in ("subscription", "freemium"):
+        # Recurring Revenue Logic
+        # Calculate duration of subscriptions
+        if not interactions:
+             ticks_per_sec = 1.0
+        else:
+             duration = interactions[-1].timestamp - interactions[0].timestamp
+             ticks_per_sec = tick_count / duration if duration > 0 else 1.0
+        
+        seconds_per_month = 30 * (1.0 / ticks_per_sec) if ticks_per_sec else 1.0
+        sim_end_time = interactions[-1].timestamp if interactions else time.time()
+        
+        # Add revenue for active periods
+        for i in buy_interactions:
+            months_active = (sim_end_time - i.timestamp) / seconds_per_month
+            if months_active < 0: months_active = 0
+            cumulative_revenue += months_active * price_per_unit
+            
+        # Subtract revenue for churned periods (approx by 'sell'/'cancel' actions)
+        sell_interactions = [i for i in interactions if i.action in ("sell", "cancel")]
+        for i in sell_interactions:
+             months_inactive = (sim_end_time - i.timestamp) / seconds_per_month
+             if months_inactive < 0: months_inactive = 0
+             cumulative_revenue -= months_inactive * price_per_unit
+             
+        if cumulative_revenue < 0: cumulative_revenue = 0
+        
+        # MRR
+        current_subs = len(buy_interactions) - len(sell_interactions)
+        if current_subs < 0: current_subs = 0
+        monthly_revenue = current_subs * price_per_unit
+    
+    # Ensure monthly_revenue is set for burn rate calc below
     
     # Burn Rate Calculation (Unit Economics)
     params = simulation.parameters
