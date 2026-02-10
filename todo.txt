@@ -9,7 +9,7 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 
 
-(B) Add test: CLI new command creates simulation with correct metadata and spawned agents (integration test using CliRunner) +test
+
 (B) Add test: CLI run command executes N ticks with mock LLM and produces expected metric count +test
 (B) Add test: CLI export command generates valid JSON/CSV/Markdown output files +test
 (B) Add test: OllamaProvider retries on 429 status and succeeds on subsequent attempt (mock httpx) +test
