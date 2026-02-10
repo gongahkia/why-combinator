@@ -80,7 +80,7 @@ class SimulationEngine:
         self._consecutive_failures = 0
         self._orig_sigint = None
         self._orig_sigterm = None
-    def _install_signal_handlers(self):
+    def _install_signal_handlers(self) -> None:
         """Install signal handlers for graceful pause/stop."""
         self._orig_sigint = signal.getsignal(signal.SIGINT)
         self._orig_sigterm = signal.getsignal(signal.SIGTERM)
@@ -96,7 +96,7 @@ class SimulationEngine:
                 self.stop()
         signal.signal(signal.SIGINT, _handle_sigint)
         signal.signal(signal.SIGTERM, lambda s, f: self.stop())
-    def _restore_signal_handlers(self):
+    def _restore_signal_handlers(self) -> None:
         if self._orig_sigint:
             signal.signal(signal.SIGINT, self._orig_sigint)
         if self._orig_sigterm:
@@ -341,7 +341,7 @@ class BatchRunner:
         self.num_runs = num_runs
         self.storage = storage
         
-    def run(self):
+    def run(self) -> None:
         """Execute the batch of simulations."""
         base_seed = self.config.seed or random.randint(0, 100000)
         
