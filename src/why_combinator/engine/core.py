@@ -373,20 +373,30 @@ class SimulationEngine:
             self.progress_callback.on_complete(summary)
         
         return summary
-    def run_loop(self, max_ticks: Optional[int] = None) -> None:
+    def run_loop(self, max_ticks: Optional[int] = None, max_seconds: Optional[float] = None) -> None:
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
         self.start()
+        start_wall_time = time.time()
         try:
             while self.is_running:
                 if self.is_paused:
                     time.sleep(0.1) # spin-wait while paused
                     continue
+                    
+                # Check wall clock timeout
+                if max_seconds and (time.time() - start_wall_time) > max_seconds:
+                    logger.warning(f"Simulation {self.simulation.id} exceeded max wall seconds ({max_seconds:.2f}s), stopping gracefully.")
+                    self.stop()
+                    break
+
                 start_real = time.time()
                 asyncio.run(self.step())
+                
                 if max_ticks and self.tick_count >= max_ticks:
                     self.stop()
                     break
+                    
                 target_loop_duration = 1.0 / self.speed_multiplier
                 elapsed = time.time() - start_real
                 if elapsed < target_loop_duration:
