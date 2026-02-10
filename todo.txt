@@ -184,6 +184,9 @@ Build Slack/Discord webhook notifications for simulation events
 Add cron-friendly mode for scheduled simulations (--headless flag)
 Implement pipe-friendly output for shell scripting integration
 
+# Naming
+Ask for AI help to brainstorm a name for the project
+
 # Stretch Goals: Web UI & PostgreSQL
 (STRETCH) Implement PostgreSQL storage backend as alternative to TinyDB
 (STRETCH) Create database migration scripts from TinyDB to PostgreSQL

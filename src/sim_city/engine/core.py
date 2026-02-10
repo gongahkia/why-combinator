@@ -73,6 +73,9 @@ class SimulationEngine:
         
         # 1. Update World State (e.g. market fluctuations)
         # TODO: Implement world physics/economy update
+        date_str = datetime.fromtimestamp(self.current_time).strftime("%Y-%m-%d %H:%M:%S")
+        self.world_state["date"] = date_str
+        self.world_state["timestamp"] = self.current_time
 
         # 2. Agent Decisions
         for agent in self.agents:
