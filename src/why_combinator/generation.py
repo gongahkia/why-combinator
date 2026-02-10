@@ -152,17 +152,39 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
         # constant high or low
         adoption_rate = 0.0 if (tick_count - t0) < 0 else 1.0
 
-    # Churn: agents who previously did positive actions but switched to negative
-    agent_actions: Dict[str, List[str]] = {}
-    for i in interactions:
-        agent_actions.setdefault(i.agent_id, []).append(i.action)
-    churned = 0
-    for aid, actions in agent_actions.items():
-        had_positive = any(a in positive_actions for a in actions[:-3] if len(actions) > 3)
-        recent_negative = any(a in negative_actions for a in actions[-3:]) if len(actions) >= 3 else False
-        if had_positive and recent_negative:
-            churned += 1
-    churn_rate = churned / total_agents
+    # Churn: Cohort-based retention decay
+    # Model: Survival(t) = 0.5 ^ (t / half_life)
+    # Churn Rate = 1 - (Active / Total)
+    
+    retention_half_life = params.get("retention_half_life", 200.0)
+    
+    if not interactions:
+        churn_rate = 0.0
+    else:
+        # Determine time scale
+        start_time = interactions[0].timestamp
+        end_time = interactions[-1].timestamp
+        duration = end_time - start_time
+        if duration <= 0:
+            ticks_per_sec = 1.0
+        else:
+            ticks_per_sec = tick_count / duration
+            
+        agent_start_times = {}
+        for i in interactions:
+            if i.agent_id not in agent_start_times:
+                agent_start_times[i.agent_id] = i.timestamp
+                
+        expected_active_sum = 0.0
+        current_time_ref = end_time
+        
+        for aid, start_ts in agent_start_times.items():
+            age_seconds = current_time_ref - start_ts
+            age_ticks = age_seconds * ticks_per_sec
+            survival_prob = 0.5 ** (age_ticks / retention_half_life)
+            expected_active_sum += survival_prob
+            
+        churn_rate = 1.0 - (expected_active_sum / len(agent_start_times)) if agent_start_times else 0.0
 
     # Market share: from competitive market results if available, else behavioral
     market_share = min(positive_count / (total * 2), 0.5)
