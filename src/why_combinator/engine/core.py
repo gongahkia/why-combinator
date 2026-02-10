@@ -16,6 +16,7 @@ from why_combinator.agent.coalition import CoalitionManager
 from why_combinator.agent.conversation import ConversationManager
 from why_combinator.agent.debate import DebateSession
 from why_combinator.engine.scenarios import MultiPhaseManager, EventGenerator, CompetitiveMarket, get_seasonal_multiplier
+from why_combinator.engine.performance import BatchWriter, AgentPool
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,13 @@ class SimulationEngine:
         self.phase_manager = MultiPhaseManager(simulation, self.event_bus)
         self.event_generator = EventGenerator(self.event_bus)
         self.competitive_market = CompetitiveMarket()
+        self._batch_writer = BatchWriter(storage)
+        self._agent_pool: Optional[AgentPool] = None
+        self._interaction_count_at_last_emit = 0
+        self._cached_interactions: List[InteractionLog] = []
         self._llm_provider = None
+        self._max_failures: Optional[int] = None
+        self._consecutive_failures = 0
         self._orig_sigint = None
         self._orig_sigterm = None
     def _install_signal_handlers(self):
@@ -69,6 +76,11 @@ class SimulationEngine:
         self.event_bus.publish("agent_created", agent.entity.to_dict(), self.current_time)
         if self._llm_provider is None and hasattr(agent, "llm_provider"):
             self._llm_provider = agent.llm_provider
+        # Use AgentPool for large simulations
+        if len(self.agents) > 20 and self._agent_pool is None:
+            self._agent_pool = AgentPool(max_active=20)
+            for a in self.agents:
+                self._agent_pool.add(a)
     def start(self):
         if self.is_running:
             return
@@ -79,6 +91,7 @@ class SimulationEngine:
     def stop(self):
         self.is_running = False
         self.is_paused = False
+        self._batch_writer.flush()
         logger.info(f"Simulation {self.simulation.id} stopped.")
         self.event_bus.publish("simulation_stopped", {"id": self.simulation.id}, self.current_time)
     def pause(self):
@@ -117,14 +130,25 @@ class SimulationEngine:
         # Inject emergence flags and sentiment into world_state
         self.world_state["emergence_flags"] = self.emergence_detector.get_flags(since_tick=max(0, len(self.emergence_detector.action_history) - 20))
         self.world_state["sentiments"] = self.sentiment_tracker.get_all_sentiments()
-        for agent in self.agents:
+        # Use AgentPool if available, otherwise all agents
+        active_agents = self._agent_pool.get_active() if self._agent_pool else self.agents
+        if self._agent_pool:
+            self._agent_pool.rotate()
+        for agent in active_agents:
             try:
                 interaction = agent.run_step(self.world_state, self.current_time)
             except Exception as e:
                 logger.error(f"Agent {agent.entity.id} step failed: {e}")
+                self._consecutive_failures += 1
+                if self._max_failures and self._consecutive_failures >= self._max_failures:
+                    logger.error(f"Max failures ({self._max_failures}) reached, stopping simulation.")
+                    self.stop()
+                    return
                 continue
             if interaction:
-                self.storage.log_interaction(interaction)
+                self._consecutive_failures = 0
+                self._batch_writer.add(interaction)
+                self._cached_interactions.append(interaction)
                 self.relationships.update_from_interaction(interaction.agent_id, interaction.target, interaction.action)
                 self.emergence_detector.observe(interaction)
                 self.sentiment_tracker.record_action(interaction.agent_id, interaction.action, str(interaction.outcome), self.current_time)
@@ -202,12 +226,17 @@ class SimulationEngine:
             if "coalitions" in params:
                 from why_combinator.agent.coalition import Coalition
                 self.coalition_manager.coalitions = [Coalition(name=c["name"], members=set(c["members"])) for c in params["coalitions"]]
+            # Reload cached interactions for incremental metrics
+            self._cached_interactions = self.storage.get_interactions(self.simulation.id)
             logger.info(f"Restored from checkpoint at tick {self.tick_count}")
             return True
         return False
     def _emit_metrics(self):
-        """Calculate and emit current metrics with seasonal multipliers."""
-        interactions = self.storage.get_interactions(self.simulation.id)
+        """Calculate and emit current metrics with seasonal multipliers using cached interactions."""
+        # Flush batch writer to ensure all interactions are persisted
+        self._batch_writer.flush()
+        # Use cached interactions for incremental metric calculation
+        interactions = self._cached_interactions
         metrics = calculate_basic_metrics(self.simulation, interactions, self.tick_count)
         # Apply seasonal multipliers
         seasonal = get_seasonal_multiplier(self.tick_count)
@@ -221,7 +250,8 @@ class SimulationEngine:
         self._latest_metrics = metrics
     def finalize(self) -> Dict[str, Any]:
         """Generate end-of-simulation critique report."""
-        interactions = self.storage.get_interactions(self.simulation.id)
+        self._batch_writer.flush()
+        interactions = self._cached_interactions or self.storage.get_interactions(self.simulation.id)
         metrics = getattr(self, "_latest_metrics", calculate_basic_metrics(self.simulation, interactions, self.tick_count))
         return generate_critique_report(self.simulation, interactions, metrics)
     def run_loop(self, max_ticks: Optional[int] = None):
