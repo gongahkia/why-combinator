@@ -5,9 +5,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 # DX/Utility: Library API, PyPI, CLI
 
-(B) Add pyproject.toml metadata: license, classifiers (Development Status, Topic, Python version), project-urls (homepage, repository, issues) +infra
-(B) Add pyproject.toml long_description pointing to README.md with content-type text/markdown for PyPI page +infra
-(B) Add version string to src/why_combinator/__init__.py and wire __version__ for programmatic access +infra
 (B) Replace ad-hoc logging.getLogger() calls with a centralized configure_logging() in config.py supporting JSON structured output via LOG_FORMAT env var +infra
 (B) Add structured log fields to engine step logging: simulation_id, tick, agent_id, action_type, duration_ms for machine-parseable logs +infra
 (B) Add --log-format flag to CLI run command: "human" (default Rich) or "json" (structured) for pipeline integration +feature
