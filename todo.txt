@@ -10,7 +10,7 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 
 
-(B) Add experiment diffing utility in analytics.py that compares two ExperimentConfig objects and outputs which variables changed between runs +reproducibility
+
 (B) Implement batch runner in engine/core.py: run N simulations with same config but different seeds, collecting results for statistical analysis +reproducibility +feature
 (B) Add cross-simulation metric aggregation to analytics.py: query all stored simulations, filter by config params, aggregate metrics (mean, stddev, percentiles) +feature
 (B) Add confidence interval calculation to analytics.py compare_simulations() for metric comparisons across batch runs +feature
