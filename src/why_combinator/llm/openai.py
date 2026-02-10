@@ -2,21 +2,20 @@ import httpx
 import logging
 import os
 import asyncio
+import time
 from typing import List, Dict, Optional, Any
-from why_combinator.llm.base import LLMProvider
+from why_combinator.llm.base import LLMProvider, RetryPolicy
 from why_combinator.config import OPENAI_API_KEY
 
 logger = logging.getLogger(__name__)
 
-RETRYABLE_STATUS_CODES = {429, 500, 503}
-
-
 class OpenAIProvider(LLMProvider):
     """OpenAI API integration."""
 
-    def __init__(self, model: str = "gpt-4o", api_key: str = OPENAI_API_KEY):
+    def __init__(self, model: str = "gpt-4o", api_key: str = OPENAI_API_KEY, retry_policy: Optional[RetryPolicy] = None):
         self.model = model
         self.api_key = api_key
+        self.retry_policy = retry_policy or RetryPolicy()
         self.client = httpx.Client(
             base_url="https://api.openai.com/v1",
             headers={"Authorization": f"Bearer {self.api_key}"},
@@ -37,23 +36,23 @@ class OpenAIProvider(LLMProvider):
             "messages": messages,
             **kwargs
         }
-        for attempt in range(3):
+        for attempt in range(self.retry_policy.max_retries):
             try:
                 response = self.client.post("/chat/completions", json=payload)
-                if response.status_code in RETRYABLE_STATUS_CODES and attempt < 2:
-                    wait = 2 ** attempt
+                if response.status_code in self.retry_policy.retryable_status_codes and attempt < self.retry_policy.max_retries - 1:
+                    wait = self.retry_policy.backoff_seconds(attempt)
                     logger.warning(f"OpenAI returned {response.status_code}, retrying in {wait}s...")
                     time.sleep(wait)
                     continue
                 response.raise_for_status()
                 return response.json()["choices"][0]["message"]["content"]
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
-                if attempt < 2:
-                    wait = 2 ** attempt
+                if attempt < self.retry_policy.max_retries - 1:
+                    wait = self.retry_policy.backoff_seconds(attempt)
                     logger.warning(f"OpenAI completion failed ({e}), retrying in {wait}s...")
                     time.sleep(wait)
                     continue
-                logger.error(f"OpenAI completion failed after 3 attempts: {e}")
+                logger.error(f"OpenAI completion failed after {self.retry_policy.max_retries} attempts: {e}")
                 return ""
         return ""
 
@@ -73,22 +72,22 @@ class OpenAIProvider(LLMProvider):
             headers={"Authorization": f"Bearer {self.api_key}"},
             timeout=60.0
         ) as client:
-            for attempt in range(3):
+            for attempt in range(self.retry_policy.max_retries):
                 try:
                     response = await client.post("/chat/completions", json=payload)
-                    if response.status_code in RETRYABLE_STATUS_CODES and attempt < 2:
-                        wait = 2 ** attempt
+                    if response.status_code in self.retry_policy.retryable_status_codes and attempt < self.retry_policy.max_retries - 1:
+                        wait = self.retry_policy.backoff_seconds(attempt)
                         logger.warning(f"OpenAI returned {response.status_code}, retrying in {wait}s...")
                         await asyncio.sleep(wait)
                         continue
                     response.raise_for_status()
                     return response.json()["choices"][0]["message"]["content"]
                 except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
-                    if attempt < 2:
-                        wait = 2 ** attempt
+                    if attempt < self.retry_policy.max_retries - 1:
+                        wait = self.retry_policy.backoff_seconds(attempt)
                         logger.warning(f"OpenAI async completion failed ({e}), retrying in {wait}s...")
                         await asyncio.sleep(wait)
                         continue
-                    logger.error(f"OpenAI async completion failed after 3 attempts: {e}")
+                    logger.error(f"OpenAI async completion failed after {self.retry_policy.max_retries} attempts: {e}")
                     return ""
         return ""

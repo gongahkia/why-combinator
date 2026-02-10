@@ -1,6 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Iterator
+from dataclasses import dataclass, field
+from typing import List, Dict, Any, Optional, Iterator, Set
 import asyncio
+
+
+@dataclass(frozen=True)
+class RetryPolicy:
+    """Retry policy for transient LLM API failures."""
+    max_retries: int = 3
+    backoff_base: float = 2.0
+    retryable_status_codes: Set[int] = field(default_factory=lambda: {429, 500, 503})
+
+    def backoff_seconds(self, attempt: int) -> float:
+        return self.backoff_base ** attempt
 
 
 class LLMProvider(ABC):

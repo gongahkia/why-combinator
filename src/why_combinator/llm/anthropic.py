@@ -4,20 +4,18 @@ import os
 import asyncio
 import time
 from typing import List, Dict, Optional, Any
-from why_combinator.llm.base import LLMProvider
+from why_combinator.llm.base import LLMProvider, RetryPolicy
 from why_combinator.config import ANTHROPIC_API_KEY
 
 logger = logging.getLogger(__name__)
 
-RETRYABLE_STATUS_CODES = {429, 500, 503}
-
-
 class AnthropicProvider(LLMProvider):
     """Anthropic API integration."""
 
-    def __init__(self, model: str = "claude-3-opus-20240229", api_key: str = ANTHROPIC_API_KEY):
+    def __init__(self, model: str = "claude-3-opus-20240229", api_key: str = ANTHROPIC_API_KEY, retry_policy: Optional[RetryPolicy] = None):
         self.model = model
         self.api_key = api_key
+        self.retry_policy = retry_policy or RetryPolicy()
         self.client = httpx.Client(
             base_url="https://api.anthropic.com/v1",
             headers={
@@ -46,23 +44,23 @@ class AnthropicProvider(LLMProvider):
         if system:
             payload["system"] = system
 
-        for attempt in range(3):
+        for attempt in range(self.retry_policy.max_retries):
             try:
                 response = self.client.post("/messages", json=payload)
-                if response.status_code in RETRYABLE_STATUS_CODES and attempt < 2:
-                    wait = 2 ** attempt
+                if response.status_code in self.retry_policy.retryable_status_codes and attempt < self.retry_policy.max_retries - 1:
+                    wait = self.retry_policy.backoff_seconds(attempt)
                     logger.warning(f"Anthropic returned {response.status_code}, retrying in {wait}s...")
                     time.sleep(wait)
                     continue
                 response.raise_for_status()
                 return response.json()["content"][0]["text"]
             except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
-                if attempt < 2:
-                    wait = 2 ** attempt
+                if attempt < self.retry_policy.max_retries - 1:
+                    wait = self.retry_policy.backoff_seconds(attempt)
                     logger.warning(f"Anthropic completion failed ({e}), retrying in {wait}s...")
                     time.sleep(wait)
                     continue
-                logger.error(f"Anthropic completion failed after 3 attempts: {e}")
+                logger.error(f"Anthropic completion failed after {self.retry_policy.max_retries} attempts: {e}")
                 return ""
         return ""
 
@@ -88,22 +86,22 @@ class AnthropicProvider(LLMProvider):
             },
             timeout=60.0
         ) as client:
-            for attempt in range(3):
+            for attempt in range(self.retry_policy.max_retries):
                 try:
                     response = await client.post("/messages", json=payload)
-                    if response.status_code in RETRYABLE_STATUS_CODES and attempt < 2:
-                        wait = 2 ** attempt
+                    if response.status_code in self.retry_policy.retryable_status_codes and attempt < self.retry_policy.max_retries - 1:
+                        wait = self.retry_policy.backoff_seconds(attempt)
                         logger.warning(f"Anthropic returned {response.status_code}, retrying in {wait}s...")
                         await asyncio.sleep(wait)
                         continue
                     response.raise_for_status()
                     return response.json()["content"][0]["text"]
                 except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as e:
-                    if attempt < 2:
-                        wait = 2 ** attempt
+                    if attempt < self.retry_policy.max_retries - 1:
+                        wait = self.retry_policy.backoff_seconds(attempt)
                         logger.warning(f"Anthropic async completion failed ({e}), retrying in {wait}s...")
                         await asyncio.sleep(wait)
                         continue
-                    logger.error(f"Anthropic async completion failed after 3 attempts: {e}")
+                    logger.error(f"Anthropic async completion failed after {self.retry_policy.max_retries} attempts: {e}")
                     return ""
         return ""
