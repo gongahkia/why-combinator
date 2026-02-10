@@ -263,26 +263,32 @@ def simulation_logs(
 def export_simulation(
     simulation_id: str = typer.Argument(...),
     output: str = typer.Option(".", help="Output directory"),
+    fmt: str = typer.Option("json", "--format", help="Export format: json, csv, md, pdf"),
 ):
-    """Export simulation data as a JSON bundle."""
+    """Export simulation data in various formats."""
+    from sim_city.export import export_json_report, export_csv_report, export_markdown_report, export_pdf_report
     storage = TinyDBStorageManager()
     simulation = storage.get_simulation(simulation_id)
     if not simulation:
         console.print(f"[red]Simulation {simulation_id} not found[/red]")
         raise typer.Exit(1)
-    agents = storage.get_agents(simulation_id)
-    interactions = storage.get_interactions(simulation_id)
-    metrics = storage.get_metrics(simulation_id)
-    bundle = {
-        "simulation": simulation.to_dict(),
-        "agents": [a.to_dict() for a in agents],
-        "interactions": [i.to_dict() for i in interactions],
-        "metrics": [m.to_dict() for m in metrics],
-        "exported_at": time.time(),
-    }
-    out_path = Path(output) / f"{simulation.name.replace(' ', '_')}_{simulation_id[:8]}.json"
-    export_json(bundle, out_path)
-    console.print(f"[green]Exported to {out_path}[/green]")
+    base = Path(output) / f"{simulation.name.replace(' ', '_')}_{simulation_id[:8]}"
+    metrics_list = storage.get_metrics(simulation_id)
+    latest_metrics = {}
+    for m in metrics_list:
+        latest_metrics[m.metric_type] = m.value
+    if fmt == "json":
+        export_json_report(storage, simulation_id, base.with_suffix(".json"))
+    elif fmt == "csv":
+        export_csv_report(storage, simulation_id, base.with_suffix(".csv"))
+    elif fmt == "md":
+        export_markdown_report(storage, simulation_id, base.with_suffix(".md"), latest_metrics)
+    elif fmt == "pdf":
+        export_pdf_report(storage, simulation_id, base.with_suffix(".pdf"), latest_metrics)
+    else:
+        console.print(f"[red]Unknown format: {fmt}. Use json, csv, md, or pdf.[/red]")
+        raise typer.Exit(1)
+    console.print(f"[green]Exported ({fmt}) to {base}*[/green]")
 
 @simulate_app.command("import")
 def import_simulation(path: str = typer.Argument(..., help="Path to JSON bundle")):
