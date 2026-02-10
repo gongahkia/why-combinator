@@ -5,6 +5,12 @@ from why_combinator.llm.openai import OpenAIProvider
 from why_combinator.llm.anthropic import AnthropicProvider
 from why_combinator.llm.mock import MockProvider
 from why_combinator.llm.huggingface import HuggingfaceProvider
+from why_combinator.exceptions import ConfigError
+from why_combinator.config import (
+    OPENAI_API_KEY,
+    ANTHROPIC_API_KEY,
+    HUGGINGFACE_API_KEY,
+)
 
 class LLMFactory:
     """Factory for creating LLM providers."""
@@ -28,10 +34,16 @@ class LLMFactory:
         if provider_type == "ollama":
             return OllamaProvider(model=model or "llama3")
         elif provider_type == "openai":
+            if not OPENAI_API_KEY:
+                raise ConfigError("Missing API key for OpenAI. Please set OPENAI_API_KEY environment variable.")
             return OpenAIProvider(model=model or "gpt-4o")
         elif provider_type == "anthropic":
+            if not ANTHROPIC_API_KEY:
+                raise ConfigError("Missing API key for Anthropic. Please set ANTHROPIC_API_KEY environment variable.")
             return AnthropicProvider(model=model or "claude-3-opus-20240229")
         elif provider_type in ("huggingface", "hf"):
+            if not HUGGINGFACE_API_KEY:
+                raise ConfigError("Missing API key for Huggingface. Please set HUGGINGFACE_API_KEY environment variable.")
             return HuggingfaceProvider(model=model or "mistralai/Mistral-7B-Instruct-v0.3")
         elif provider_type == "mock":
             return MockProvider()
