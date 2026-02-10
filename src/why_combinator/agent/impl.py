@@ -26,6 +26,18 @@ class GenericAgent(BaseAgent):
             perception["emergence_flags"] = world_state["emergence_flags"][-3:]
         if "active_event" in world_state:
             perception["active_event"] = world_state["active_event"]
+            
+        # Inject Key Performance Indicators (KPIs) for economic awareness
+        if "metrics" in world_state:
+            m = world_state["metrics"]
+            perception["startup_kpis"] = {
+                "runway_months": m.get("runway_months", "Unknown"),
+                "monthly_burn": m.get("burn_rate", "Unknown"),
+                "cumulative_revenue": m.get("revenue", "Unknown"),
+                "adoption_p_all": m.get("adoption_rate", "Unknown"),
+                "churn_rate": m.get("churn_rate", "Unknown"),
+                "market_share": m.get("market_share", "Unknown")
+            }
         return perception
     def reason(self, perception: Dict[str, Any]) -> Dict[str, Any]:
         sim_context_str = SIMULATION_CONTEXT.format(

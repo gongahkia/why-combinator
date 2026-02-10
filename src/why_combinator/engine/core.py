@@ -140,6 +140,11 @@ class SimulationEngine:
         # Inject emergence flags and sentiment into world_state
         self.world_state["emergence_flags"] = self.emergence_detector.get_flags(since_tick=max(0, len(self.emergence_detector.action_history) - 20))
         self.world_state["sentiments"] = self.sentiment_tracker.get_all_sentiments()
+        
+        # Inject current metrics (runway, adoption, churn, revenue, burn)
+        # Note: These are from the last 10-tick emit cycle, so might be slightly stale.
+        self.world_state["metrics"] = getattr(self, "_latest_metrics", {})
+        
         # Use AgentPool if available, otherwise all agents
         active_agents = self._agent_pool.get_active() if self._agent_pool else self.agents
         if self._agent_pool:
