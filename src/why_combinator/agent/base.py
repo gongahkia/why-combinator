@@ -4,7 +4,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from why_combinator.models import AgentEntity, InteractionLog
+from why_combinator.models import AgentEntity, InteractionLog, WorldState, InteractionOutcome
 from why_combinator.events import EventBus
 
 
@@ -18,11 +18,12 @@ class BaseAgent(ABC):
         self.goals: List[Dict[str, Any]] = [] # agent goals: [{goal, priority, progress}]
         self.strategy: str = "" # current high-level strategy
         self.difficulty: float = 1.0 # 1.0=baseline, increases over time
+        self.difficulty: float = 1.0 # 1.0=baseline, increases over time
         self._steps_taken: int = 0
-        self._invariants: List[Tuple[str, Callable[[InteractionLog, Dict[str, Any]], bool]]] = [] 
+        self._invariants: List[Tuple[str, Callable[[InteractionLog, WorldState], bool]]] = [] 
         self.event_bus.subscribe("agent_message", self._on_message)
         
-    def add_invariant(self, name: str, check: Callable[[InteractionLog, Dict[str, Any]], bool]):
+    def add_invariant(self, name: str, check: Callable[[InteractionLog, WorldState], bool]):
         """Register an invariant check. Raises exception if check returns False."""
         self._invariants.append((name, check))
     def _on_message(self, event):
@@ -61,15 +62,15 @@ class BaseAgent(ABC):
         self.strategy = strategy
         self.add_memory(f"Strategy updated: {strategy}", role="strategy")
     @abstractmethod
-    def perceive(self, world_state: Dict[str, Any]) -> Dict[str, Any]:
+    def perceive(self, world_state: WorldState) -> Dict[str, Any]:
         pass
     @abstractmethod
-    def reason(self, perception: Dict[str, Any]) -> Dict[str, Any]:
+    def reason(self, perception: Dict[str, Any]) -> InteractionOutcome:
         pass
     @abstractmethod
-    def act(self, decision: Dict[str, Any]) -> InteractionLog:
+    def act(self, decision: InteractionOutcome) -> InteractionLog:
         pass
-    def run_step(self, world_state: Dict[str, Any], timestamp: float) -> Optional[InteractionLog]:
+    def run_step(self, world_state: WorldState, timestamp: float) -> Optional[InteractionLog]:
         self._steps_taken += 1
         if self._steps_taken % 20 == 0:
             self.difficulty = min(3.0, self.difficulty + 0.1)

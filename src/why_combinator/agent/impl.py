@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional
 import logging
 import json
-from why_combinator.models import AgentEntity, InteractionLog
+from why_combinator.models import AgentEntity, InteractionLog, WorldState, InteractionOutcome
 from why_combinator.events import EventBus
 from why_combinator.agent.base import BaseAgent
 from why_combinator.llm.base import LLMProvider
@@ -20,7 +20,8 @@ class GenericAgent(BaseAgent):
         # Add basic invariants
         self.add_invariant("role_integrity", self._check_role_integrity)
         
-    def _check_role_integrity(self, interaction: InteractionLog, world_state: Dict[str, Any]) -> bool:
+        
+    def _check_role_integrity(self, interaction: InteractionLog, world_state: WorldState) -> bool:
         """Ensure actions are consistent with agent role."""
         action = interaction.action.lower()
         role = self.entity.type.value
@@ -34,20 +35,24 @@ class GenericAgent(BaseAgent):
             return False
             
         return True
-    def perceive(self, world_state: Dict[str, Any]) -> Dict[str, Any]:
-        perception = dict(world_state)
+    def perceive(self, world_state: WorldState) -> Dict[str, Any]:
+        perception = dict(world_state.metrics) if world_state.metrics else {}
+        perception["date"] = world_state.date
+        perception["stage"] = world_state.stage
+        perception["agents"] = world_state.agents
+        perception["sentiments"] = world_state.sentiments
         messages = self.get_pending_messages()
         if messages:
             perception["incoming_messages"] = [{"from": m.get("sender_name", "?"), "content": m.get("content", "")} for m in messages]
         # Inject emergence flags and active events for agent awareness
-        if "emergence_flags" in world_state:
-            perception["emergence_flags"] = world_state["emergence_flags"][-3:]
-        if "active_event" in world_state:
-            perception["active_event"] = world_state["active_event"]
+        if world_state.emergence_events:
+            perception["emergence_flags"] = world_state.emergence_events[-3:]
+        if world_state.active_events:
+            perception["active_event"] = world_state.active_events
             
         # Inject Key Performance Indicators (KPIs) for economic awareness
-        if "metrics" in world_state:
-            m = world_state["metrics"]
+        if world_state.metrics:
+            m = world_state.metrics
             perception["startup_kpis"] = {
                 "runway_months": m.get("runway_months", "Unknown"),
                 "monthly_burn": m.get("burn_rate", "Unknown"),
@@ -58,7 +63,7 @@ class GenericAgent(BaseAgent):
                 "product_quality": m.get("product_quality", "Unknown")
             }
         return perception
-    def reason(self, perception: Dict[str, Any]) -> Dict[str, Any]:
+    def reason(self, perception: Dict[str, Any]) -> InteractionOutcome:
         sim_context_str = SIMULATION_CONTEXT.format(
             industry=self.world_context.get("industry", "Unknown"),
             stage=self.world_context.get("stage", "Unknown"),
@@ -112,10 +117,16 @@ class GenericAgent(BaseAgent):
             self.set_goal(decision["new_goal"], priority=decision.get("goal_priority", 0.5))
         if decision.get("strategy_update"): # LLM can update strategy
             self.set_strategy(decision["strategy_update"])
-        return decision
-    def act(self, decision: Dict[str, Any]) -> InteractionLog:
-        action_type = decision.get("action_type", "wait")
-        details = decision.get("action_details", {})
+        return InteractionOutcome(
+            thought_process=decision.get("thought_process", ""),
+            action_type=decision.get("action_type", "wait"),
+            target=decision.get("action_details", {}).get("target", "system"),
+            details=decision.get("action_details", {}),
+            confidence=decision.get("confidence", 1.0)
+        )
+    def act(self, decision: InteractionOutcome) -> InteractionLog:
+        action_type = decision.action_type
+        details = decision.details
         if action_type == "send_message" and details.get("target_agent_id"): # inter-agent comm
             self.send_message(details["target_agent_id"], details.get("content", ""), timestamp=0.0)
         log = InteractionLog(
@@ -123,7 +134,7 @@ class GenericAgent(BaseAgent):
             simulation_id=self.world_context.get("id", ""),
             timestamp=0.0,
             action=action_type,
-            target=details.get("target", "system"),
+            target=decision.target,
             outcome=details
         )
         return log

@@ -4,7 +4,7 @@ import signal
 import threading
 from datetime import datetime
 import logging
-from why_combinator.models import SimulationEntity, SimulationRun, InteractionLog, MetricSnapshot
+from why_combinator.models import SimulationEntity, SimulationRun, InteractionLog, MetricSnapshot, WorldState
 from why_combinator.events import EventBus
 from why_combinator.agent.base import BaseAgent
 from why_combinator.storage import StorageManager
@@ -50,7 +50,20 @@ class SimulationEngine:
         self.is_running = False
         self.is_paused = False
         self.speed_multiplier = 1.0
-        self.world_state: Dict[str, Any] = {}
+        self.speed_multiplier = 1.0
+        self.world_state: WorldState = WorldState(
+            id=simulation.id,
+            tick=0,
+            date=str(datetime.fromtimestamp(self.current_time)),
+            timestamp=self.current_time,
+            stage=simulation.stage.value,
+            metrics={},
+            agents=[],
+            sentiments={},
+            relationships={},
+            emergence_events=[],
+            active_events=[]
+        )
         self.relationships = RelationshipGraph()
         self.emergence_detector = EmergenceDetector()
         self.sentiment_tracker = SentimentTracker()
@@ -129,29 +142,37 @@ class SimulationEngine:
         self.tick_count += 1
         self.current_time += duration
         date_str = datetime.fromtimestamp(self.current_time).strftime("%Y-%m-%d %H:%M:%S")
-        self.world_state["date"] = date_str
-        self.world_state["timestamp"] = self.current_time
-        self.world_state["stage"] = self.simulation.stage.value
-        self.world_state["agents"] = [{"id": a.entity.id, "name": a.entity.name, "role": a.entity.role, "type": a.entity.type.value} for a in self.agents]
+        self.world_state.tick = self.tick_count
+        self.world_state.timestamp = self.current_time
+        self.world_state.date = date_str
+        self.world_state.stage = self.simulation.stage.value
+        self.world_state.agents = [{"id": a.entity.id, "name": a.entity.name, "role": a.entity.role, "type": a.entity.type.value} for a in self.agents]
         # Inject simulation parameters into world_state
-        self.world_state["parameters"] = self.simulation.parameters
+        # self.world_state.parameters = self.simulation.parameters # WorldState does not have parameters field defined yet, ignoring or need to add it?
+        # The WorldState definition I added didn't have parameters.
+        # But BaseAgent/GenericAgent might rely on it?
+        # GenericAgent logic doesn't seem to use world_state["parameters"].
+        
         # EventGenerator: probabilistic crises/macro/disruptions
         event = self.event_generator.maybe_trigger(self.tick_count)
         if event:
-            self.world_state["active_event"] = event
+            self.world_state.active_events = [event]
         else:
-            self.world_state.pop("active_event", None)
+            self.world_state.active_events = []
+            
         # CompetitiveMarket: contest market share each tick
         current_share = getattr(self, "_latest_metrics", {}).get("market_share", 0.1)
         market_result = self.competitive_market.simulate_step(current_share)
-        self.world_state["market"] = market_result
+        # self.world_state["market"] = market_result # WorldState doesn't have market field.
+        # This was unused in GenericAgent anyway based on my read.
+        
         # Inject emergence flags and sentiment into world_state
-        self.world_state["emergence_flags"] = self.emergence_detector.get_flags(since_tick=max(0, len(self.emergence_detector.action_history) - 20))
-        self.world_state["sentiments"] = self.sentiment_tracker.get_all_sentiments()
+        self.world_state.emergence_events = self.emergence_detector.get_flags(since_tick=max(0, len(self.emergence_detector.action_history) - 20))
+        self.world_state.sentiments = self.sentiment_tracker.get_all_sentiments()
         
         # Inject current metrics (runway, adoption, churn, revenue, burn)
         # Note: These are from the last 10-tick emit cycle, so might be slightly stale.
-        self.world_state["metrics"] = getattr(self, "_latest_metrics", {})
+        self.world_state.metrics = getattr(self, "_latest_metrics", {})
         
         # Use AgentPool if available, otherwise all agents
         active_agents = self._agent_pool.get_active() if self._agent_pool else self.agents

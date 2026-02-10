@@ -57,6 +57,39 @@ class FundingState:
     revenue_growth_rate: float = 0.05
     burn_growth_rate: float = 0.02
 
+@dataclass
+class WorldState:
+    """Snapshot of the simulation state passed to agents."""
+    id: str
+    tick: int
+    date: str
+    timestamp: float
+    stage: str 
+    metrics: Dict[str, Any]
+    agents: List[Dict[str, Any]]
+    sentiments: Dict[str, float]
+    relationships: Dict[str, Any]
+    emergence_events: List[Any] = field(default_factory=list)
+    active_events: List[Any] = field(default_factory=list)
+    
+    # Helper for backward compatibility during migration
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+@dataclass
+class InteractionOutcome:
+    """Typed outcome of an agent's reasoning process."""
+    thought_process: str
+    action_type: str
+    target: str
+    details: Dict[str, Any]
+    confidence: float = 1.0
+    
+    def to_dict(self):
+        return asdict(self)
+
 
 @dataclass
 class ExperimentConfig:

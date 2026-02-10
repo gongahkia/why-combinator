@@ -175,7 +175,7 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
         price_per_unit=price_per_unit
     )
     
-    burn_rate = calculate_burn_rate(unit_econ, monthly_revenue, monthly_new_customers, interactions)
+    burn_rate = calculate_burn_rate(unit_econ, monthly_revenue, monthly_new_customers, interactions, market_params)
     
     # 6. Runway
     funding = FundingState(

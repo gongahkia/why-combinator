@@ -120,15 +120,31 @@ def calculate_revenue_metrics(
         "monthly_new_customers": monthly_new_customers
     }
 
+def calculate_effective_cac(base_cac: float, market_params: MarketParams) -> float:
+    """
+    Calculate effective CAC adjusting for competition complexity.
+    CAC increases linearly with competitor count (diminishing returns).
+    """
+    # 10% increase in CAC per competitor
+    competition_penalty = 1.0 + (market_params.competitor_count * 0.1)
+    return base_cac * competition_penalty
+
 def calculate_burn_rate(
     econ: UnitEconomics, 
     monthly_revenue: float, 
     monthly_new_customers: float, 
-    interactions: List[InteractionLog]
+    interactions: List[InteractionLog],
+    market_params: Optional[MarketParams] = None
 ) -> float:
     """Calculate monthly burn rate using unit economics."""
     cogs = monthly_revenue * (1 - econ.gross_margin)
-    marketing_spend = monthly_new_customers * econ.cac
+    
+    # Calculate effective CAC
+    effective_cac = econ.cac
+    if market_params:
+        effective_cac = calculate_effective_cac(econ.cac, market_params)
+        
+    marketing_spend = monthly_new_customers * effective_cac
     variable_opex = monthly_revenue * econ.opex_ratio
     
     burn_rate = econ.base_opex + cogs + marketing_spend + variable_opex
