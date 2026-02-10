@@ -3,8 +3,8 @@ Tech Stack: Python CLI (Typer/Rich), TinyDB/JSON+SQLite, Ollama/Huggingface/LLM 
 Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Research reproducibility + economic plausibility.
 ================================================================================
 
-(B) Add revenue model to generation.py supporting subscription (MRR), transactional, and freemium pricing with configurable params per simulation +economics
-(B) Add runway_months calculation that factors in revenue growth rate and burn growth rate, not just static (capital-cumulative_burn)/monthly_burn +economics
+
+
 (B) Create src/why_combinator/economics.py module encapsulating all metric formulas with typed dataclass inputs (UnitEconomics, MarketParams, FundingState) +economics +refactor
 (B) Add metric feedback injection into GenericAgent.perceive() so agents receive current metrics (runway, adoption, churn) as part of world_state perception +economics +feature
 (B) Add investor agent behavior rule: reject funding when burn_rate/revenue ratio exceeds threshold from simulation config +economics +feature

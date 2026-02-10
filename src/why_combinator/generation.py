@@ -4,6 +4,11 @@ import math
 import time
 from typing import Dict, Any, List
 from why_combinator.models import SimulationEntity, MetricSnapshot, InteractionLog
+from why_combinator.economics import (
+    calculate_adoption_rate, calculate_churn_rate, calculate_market_share,
+    calculate_revenue_metrics, calculate_burn_rate, calculate_runway,
+    MarketParams, UnitEconomics, FundingState
+)
 
 CUSTOMER_FEEDBACK_TEMPLATES = [
     "I {feeling} this product. {reason}",
@@ -128,204 +133,67 @@ def generate_critique_report(simulation: SimulationEntity, interactions: List[In
 
 def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[InteractionLog], tick_count: int) -> Dict[str, float]:
     """Calculate metrics derived from agent behavior."""
-    positive_actions = {"buy", "invest", "partner", "collaborate"}
-    negative_actions = {"complain", "sell", "criticize", "ignore"}
-    total_agents = max(len(set(i.agent_id for i in interactions)), 1)
-    total = len(interactions) or 1
-
-    # Adoption: Logistic S-Curve model
-    # Model: P(t) = 1 / (1 + exp(-k * (t - t0)))
     params = simulation.parameters
-    viral_coeff = params.get("viral_coefficient", 0.1)
-    conv_rate = params.get("conversion_rate", 0.05)
     
-    # k denotes the growth rate (steepness)
-    # We combine viral coefficient and conversion rate to derive k
-    k = (viral_coeff * 0.5) + (conv_rate * 2.0)
+    # 1. Adoption Rate
+    market_params = MarketParams(
+        tam=float(params.get("tam", 10000.0)),
+        viral_coefficient=float(params.get("viral_coefficient", 0.1)),
+        conversion_rate=float(params.get("conversion_rate", 0.05)),
+        competitor_count=int(params.get("competitor_count", 3)),
+        competitor_quality_avg=float(params.get("competitor_quality_avg", 0.5)),
+        retention_half_life=float(params.get("retention_half_life", 200.0)),
+        inflection_tick=int(params.get("inflection_tick", 100))
+    )
     
-    # t0 is the inflection point (ticks to 50% adoption)
-    t0 = params.get("inflection_tick", 100)
+    adoption_rate = calculate_adoption_rate(market_params, tick_count)
     
-    try:
-        adoption_rate = 1.0 / (1.0 + math.exp(-k * (tick_count - t0)))
-    except OverflowError:
-        # constant high or low
-        adoption_rate = 0.0 if (tick_count - t0) < 0 else 1.0
-
-    # Churn: Cohort-based retention decay
-    # Model: Survival(t) = 0.5 ^ (t / half_life)
-    # Churn Rate = 1 - (Active / Total)
+    # 2. Churn Rate
+    churn_rate = calculate_churn_rate(interactions, tick_count, market_params.retention_half_life)
     
-    retention_half_life = params.get("retention_half_life", 200.0)
+    # 3. Market Share
+    market_share = calculate_market_share(interactions, market_params)
     
-    if not interactions:
-        churn_rate = 0.0
-    else:
-        # Determine time scale
-        start_time = interactions[0].timestamp
-        end_time = interactions[-1].timestamp
-        duration = end_time - start_time
-        if duration <= 0:
-            ticks_per_sec = 1.0
-        else:
-            ticks_per_sec = tick_count / duration
-            
-        agent_start_times = {}
-        for i in interactions:
-            if i.agent_id not in agent_start_times:
-                agent_start_times[i.agent_id] = i.timestamp
-                
-        expected_active_sum = 0.0
-        current_time_ref = end_time
-        
-        for aid, start_ts in agent_start_times.items():
-            age_seconds = current_time_ref - start_ts
-            age_ticks = age_seconds * ticks_per_sec
-            survival_prob = 0.5 ** (age_ticks / retention_half_life)
-            expected_active_sum += survival_prob
-            
-        churn_rate = 1.0 - (expected_active_sum / len(agent_start_times)) if agent_start_times else 0.0
-
-    # Market share: Relative Product Quality vs Competitors
-    # Share = Q_me / (Q_me + Sum(Q_comp))
+    # 4. Revenue Metrics
+    price_per_unit = float(params.get("price_per_unit", 100.0))
+    revenue_model = str(params.get("revenue_model", "transactional"))
     
-    # Calculate My Quality Score based on interaction sentiment proxy
-    # We define quality as ratio of positive to negative interactions
-    positive_interactions = sum(1 for i in interactions if i.action in positive_actions)
-    negative_interactions = sum(1 for i in interactions if i.action in negative_actions)
-    total_relevant = positive_interactions + negative_interactions
+    revenue_metrics = calculate_revenue_metrics(interactions, tick_count, price_per_unit, revenue_model)
+    monthly_revenue = revenue_metrics["monthly_revenue"]
+    cumulative_revenue = revenue_metrics["cumulative_revenue"]
+    monthly_new_customers = revenue_metrics["monthly_new_customers"]
     
-    if total_relevant > 0:
-        my_quality_score = positive_interactions / total_relevant
-    else:
-        my_quality_score = 0.5 # Neutral baseline
-        
-    # Competitor parameters
-    competitor_count = params.get("competitor_count", 3)
-    competitor_quality_avg = params.get("competitor_quality_avg", 0.5)
+    # 5. Burn Rate
+    unit_econ = UnitEconomics(
+        cac=float(params.get("cac", 50.0)),
+        gross_margin=float(params.get("gross_margin", 0.7)),
+        opex_ratio=float(params.get("opex_ratio", 0.5)),
+        base_opex=float(params.get("base_opex", 5000.0)),
+        price_per_unit=price_per_unit
+    )
     
-    # Market Share formula
-    if competitor_count == 0:
-         market_share = my_quality_score # Monopoly modulated by quality?? Or 1.0?
-         # If monopoly, share is 1.0 of the addressable market captured so far?
-         # But "Market Share" usually implies relative to competition.
-         # We'll use 1.0 if no competitors, but usually market share <= 1.0
-         market_share = 1.0
-    else:
-         total_quality_pool = my_quality_score + (competitor_count * competitor_quality_avg)
-         market_share = my_quality_score / total_quality_pool if total_quality_pool > 0 else 0.0
-
-    # Revenue Model
-    # Supports: transactional (one-off), subscription (recurring), freemium (recurring)
-    revenue_model = params.get("revenue_model", "transactional") 
-    price_per_unit = params.get("price_per_unit", 100.0)
-    month_window = 30
+    burn_rate = calculate_burn_rate(unit_econ, monthly_revenue, monthly_new_customers, interactions)
     
-    buy_interactions = [i for i in interactions if i.action == "buy"]
-    buy_count_total = len(buy_interactions)
+    # 6. Runway
+    funding = FundingState(
+        initial_capital=float(params.get("initial_capital", 500000)),
+        revenue_growth_rate=float(params.get("revenue_growth_rate", 0.05)),
+        burn_growth_rate=float(params.get("burn_growth_rate", 0.02))
+    )
     
-    # Monthly New Customers (Rate approximation)
-    monthly_new_customers = (buy_count_total / max(tick_count, 1)) * 30
-    
-    monthly_revenue = 0.0
-    cumulative_revenue = 0.0
-    
-    if revenue_model == "transactional":
-        cumulative_revenue = buy_count_total * price_per_unit
-        monthly_revenue = monthly_new_customers * price_per_unit
-        
-    elif revenue_model in ("subscription", "freemium"):
-        # Recurring Revenue Logic
-        # Calculate duration of subscriptions
-        if not interactions:
-             ticks_per_sec = 1.0
-        else:
-             duration = interactions[-1].timestamp - interactions[0].timestamp
-             ticks_per_sec = tick_count / duration if duration > 0 else 1.0
-        
-        seconds_per_month = 30 * (1.0 / ticks_per_sec) if ticks_per_sec else 1.0
-        sim_end_time = interactions[-1].timestamp if interactions else time.time()
-        
-        # Add revenue for active periods
-        for i in buy_interactions:
-            months_active = (sim_end_time - i.timestamp) / seconds_per_month
-            if months_active < 0: months_active = 0
-            cumulative_revenue += months_active * price_per_unit
-            
-        # Subtract revenue for churned periods (approx by 'sell'/'cancel' actions)
-        sell_interactions = [i for i in interactions if i.action in ("sell", "cancel")]
-        for i in sell_interactions:
-             months_inactive = (sim_end_time - i.timestamp) / seconds_per_month
-             if months_inactive < 0: months_inactive = 0
-             cumulative_revenue -= months_inactive * price_per_unit
-             
-        if cumulative_revenue < 0: cumulative_revenue = 0
-        
-        # MRR
-        current_subs = len(buy_interactions) - len(sell_interactions)
-        if current_subs < 0: current_subs = 0
-        monthly_revenue = current_subs * price_per_unit
-    
-    # Ensure monthly_revenue is set for burn rate calc below
-    
-    # Burn Rate Calculation (Unit Economics)
-    params = simulation.parameters
-    cac = params.get("cac", 50.0)
-    gross_margin = params.get("gross_margin", 0.7)
-    opex_ratio = params.get("opex_ratio", 0.5) # Opex as % of Revenue
-    base_opex = params.get("base_opex", 5000.0) # Fixed monthly cost
-    
-    cogs = monthly_revenue * (1 - gross_margin)
-    marketing_spend = monthly_new_customers * cac
-    variable_opex = monthly_revenue * opex_ratio
-    
-    burn_rate = base_opex + cogs + marketing_spend + variable_opex
-    
-    # Adjust for morale
-    employee_actions = [i for i in interactions if i.action in ("complain", "wait") and "employee" in str(i.outcome).lower()]
-    morale_factor = 1.0 + len(employee_actions) * 0.001 
-    burn_rate *= morale_factor
-
-    revenue = cumulative_revenue
-    
-    # Runway Calculation (Iterative Growth Model)
-    # Allows factoring in revenue and burn growth rates vs static snapshot
-    initial_capital = params.get("initial_capital", 500000)
     months_elapsed = max(tick_count / 30, 1)
+    cumulative_burn_approx = burn_rate * months_elapsed
     
-    # Approximate cumulative burn via current rate (imperfect but consistent with snapshot approach)
-    cumulative_burn = burn_rate * months_elapsed
+    runway_months = calculate_runway(
+        funding, burn_rate, monthly_revenue, 
+        cumulative_burn_approx, cumulative_revenue, tick_count
+    )
     
-    current_cash = initial_capital - cumulative_burn + revenue 
-    
-    if current_cash <= 0:
-        runway_months = 0.0
-    else:
-        # Get growth rates (MoM)
-        revenue_growth_rate = params.get("revenue_growth_rate", 0.05) 
-        burn_growth_rate = params.get("burn_growth_rate", 0.02)
-        
-        sim_runway = 0
-        temp_cash = current_cash
-        sim_revenue = monthly_revenue
-        sim_burn = burn_rate
-        
-        # Simulate up to 60 months (5 years)
-        while temp_cash > 0 and sim_runway < 60:
-            sim_runway += 1
-            # Next month projection
-            sim_revenue *= (1 + revenue_growth_rate)
-            sim_burn *= (1 + burn_growth_rate)
-            net_burn = sim_burn - sim_revenue
-            temp_cash -= net_burn
-            
-        runway_months = float(sim_runway)
-
     return {
         "adoption_rate": round(adoption_rate, 4),
         "churn_rate": round(churn_rate, 4),
         "market_share": round(market_share, 4),
         "burn_rate": round(burn_rate, 2),
-        "revenue": round(revenue, 2),
+        "revenue": round(cumulative_revenue, 2),
         "runway_months": round(runway_months, 1),
     }
