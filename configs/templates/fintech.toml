@@ -1,0 +1,11 @@
+[simulation]
+name = "Fintech Startup"
+industry = "Fintech"
+description = "Financial technology platform for payments and banking"
+stage = "mvp"
+
+[parameters]
+market_size = 10000000
+initial_capital = 1000000
+pricing_model = "transaction_fee"
+target_segment = "enterprise"

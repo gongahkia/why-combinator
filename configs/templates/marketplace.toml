@@ -1,0 +1,11 @@
+[simulation]
+name = "Marketplace Startup"
+industry = "Marketplace"
+description = "Two-sided marketplace connecting buyers and sellers"
+stage = "idea"
+
+[parameters]
+market_size = 5000000
+initial_capital = 200000
+pricing_model = "commission"
+target_segment = "consumer"

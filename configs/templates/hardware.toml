@@ -1,0 +1,11 @@
+[simulation]
+name = "Hardware Startup"
+industry = "Hardware"
+description = "Consumer electronics / IoT hardware device"
+stage = "idea"
+
+[parameters]
+market_size = 2000000
+initial_capital = 750000
+pricing_model = "one_time_purchase"
+target_segment = "consumer"

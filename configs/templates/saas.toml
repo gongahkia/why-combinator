@@ -1,0 +1,11 @@
+[simulation]
+name = "SaaS Startup"
+industry = "SaaS"
+description = "B2B Software-as-a-Service platform"
+stage = "mvp"
+
+[parameters]
+market_size = 1000000
+initial_capital = 500000
+pricing_model = "subscription"
+target_segment = "SMB"
