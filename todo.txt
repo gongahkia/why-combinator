@@ -4,7 +4,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 ================================================================================
 
 # Stability/Scaling: Async, Storage, Error Handling, Tests
-(B) Add TinyDB-to-SQLite migration script as CLI subcommand: why-combinator migrate --from tinydb --to sqlite +feature +infra
 (B) Add cross-simulation SQL query support: StorageManager.query_metrics(filters: MetricFilter) returning aggregated results across simulations +feature
 (B) Add agent memory eviction policy in agent/base.py: configurable max_memory_size; when exceeded, summarize oldest N memories into single summary entry +performance +feature
 (B) Add memory summarization prompt in agent/prompts.py for LLM-based memory compression when eviction triggers +feature
