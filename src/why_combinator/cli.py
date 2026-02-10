@@ -98,13 +98,13 @@ def run_simulation(
         if not headless:
             console.print(f"[red]Simulation {simulation_id} not found![/red]")
         raise typer.Exit(code=1)
-    engine = SimulationEngine(simulation, storage)
+    engine = SimulationEngine(simulation, storage, seed=seed)
     engine.speed_multiplier = speed
     if max_failures is not None:
         engine._max_failures = max_failures
     try:
         llm = LLMFactory.create(model)
-        if cache:
+        if cache or seed is not None:
             llm = CachedLLMProvider(llm)
     except Exception as e:
         if not headless:
