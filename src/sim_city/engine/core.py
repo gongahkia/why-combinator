@@ -77,9 +77,8 @@ class SimulationEngine:
         self.world_state["date"] = date_str
         self.world_state["timestamp"] = self.current_time
 
-        # 2. Agent Decisions
+        self.world_state["agents"] = [{"id": a.entity.id, "name": a.entity.name, "role": a.entity.role, "type": a.entity.type.value} for a in self.agents] # agent roster for inter-agent comms
         for agent in self.agents:
-            # Agents act based on current world state
             interaction = agent.run_step(self.world_state, self.current_time)
             if interaction:
                 self.storage.log_interaction(interaction)
