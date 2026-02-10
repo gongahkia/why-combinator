@@ -5,8 +5,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization
 
 --- PHASE 3: FULL FEATURE SET ---
 
-(DONE) Rename the project "Why-Combinator" and make every reference to the project within the repo the name "Why-Combinator"
-
 # Stretch Goals: Web UI & PostgreSQL
 (STRETCH) Implement PostgreSQL storage backend as alternative to TinyDB
 (STRETCH) Create database migration scripts from TinyDB to PostgreSQL
