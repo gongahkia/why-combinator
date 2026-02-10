@@ -36,7 +36,8 @@ class GenericAgent(BaseAgent):
                 "cumulative_revenue": m.get("revenue", "Unknown"),
                 "adoption_p_all": m.get("adoption_rate", "Unknown"),
                 "churn_rate": m.get("churn_rate", "Unknown"),
-                "market_share": m.get("market_share", "Unknown")
+                "market_share": m.get("market_share", "Unknown"),
+                "product_quality": m.get("product_quality", "Unknown")
             }
         return perception
     def reason(self, perception: Dict[str, Any]) -> Dict[str, Any]:

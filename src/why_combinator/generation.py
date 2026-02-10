@@ -7,6 +7,7 @@ from why_combinator.models import SimulationEntity, MetricSnapshot, InteractionL
 from why_combinator.economics import (
     calculate_adoption_rate, calculate_churn_rate, calculate_market_share,
     calculate_revenue_metrics, calculate_burn_rate, calculate_runway,
+    calculate_product_quality,
     MarketParams, UnitEconomics, FundingState
 )
 
@@ -153,6 +154,7 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
     
     # 3. Market Share
     market_share = calculate_market_share(interactions, market_params)
+    product_quality = calculate_product_quality(interactions)
     
     # 4. Revenue Metrics
     price_per_unit = float(params.get("price_per_unit", 100.0))
@@ -193,6 +195,7 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
         "adoption_rate": round(adoption_rate, 4),
         "churn_rate": round(churn_rate, 4),
         "market_share": round(market_share, 4),
+        "product_quality": round(product_quality, 4),
         "burn_rate": round(burn_rate, 2),
         "revenue": round(cumulative_revenue, 2),
         "runway_months": round(runway_months, 1),

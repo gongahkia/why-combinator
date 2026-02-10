@@ -67,8 +67,8 @@ def calculate_churn_rate(interactions: List[InteractionLog], tick_count: int, re
         
     return 1.0 - (expected_active_sum / len(agent_start_times)) if agent_start_times else 0.0
 
-def calculate_market_share(interactions: List[InteractionLog], params: MarketParams) -> float:
-    """Calculate market share based on relative quality."""
+def calculate_product_quality(interactions: List[InteractionLog]) -> float:
+    """Calculate product quality score (0.0 - 1.0) based on interaction sentiment."""
     positive_actions = {"buy", "invest", "partner", "collaborate"}
     negative_actions = {"complain", "sell", "criticize", "ignore"}
     
@@ -77,9 +77,13 @@ def calculate_market_share(interactions: List[InteractionLog], params: MarketPar
     total_relevant = positive_interactions + negative_interactions
     
     if total_relevant > 0:
-        my_quality_score = positive_interactions / total_relevant
+        return positive_interactions / total_relevant
     else:
-        my_quality_score = 0.5 # Neutral baseline
+        return 0.5 # Neutral baseline
+
+def calculate_market_share(interactions: List[InteractionLog], params: MarketParams) -> float:
+    """Calculate market share based on relative quality."""
+    my_quality_score = calculate_product_quality(interactions)
         
     if params.competitor_count == 0:
          return 1.0

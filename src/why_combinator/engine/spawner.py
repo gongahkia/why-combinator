@@ -6,9 +6,9 @@ from why_combinator.agent.archetypes import get_archetype, get_archetypes_by_typ
 def generate_initial_agents(simulation: SimulationEntity) -> List[AgentEntity]:
     """Generate the initial set of agents based on simulation parameters."""
     agents = []
-    agents.append(create_agent(type=StakeholderType.CUSTOMER, role="Early Adopter", simulation=simulation, personality={"openness": 0.9, "skepticism": 0.2, "segment": "early_adopter"}, behavior_rules=["Evaluate product based on innovation", "Provide honest feedback"]))
-    agents.append(create_agent(type=StakeholderType.CUSTOMER, role="Mainstream User", simulation=simulation, personality={"openness": 0.4, "skepticism": 0.6, "segment": "mainstream"}, behavior_rules=["Require proven value", "Price sensitive", "Compare alternatives"]))
-    agents.append(create_agent(type=StakeholderType.CUSTOMER, role="Late Majority", simulation=simulation, personality={"openness": 0.2, "skepticism": 0.8, "segment": "laggard"}, behavior_rules=["Resist change", "Only adopt when necessary", "Demand simplicity"]))
+    agents.append(create_agent(type=StakeholderType.CUSTOMER, role="Early Adopter", simulation=simulation, personality={"openness": 0.9, "skepticism": 0.2, "segment": "early_adopter"}, behavior_rules=["Evaluate product based on innovation", "Provide honest feedback", "Churn if product quality score < 0.3"]))
+    agents.append(create_agent(type=StakeholderType.CUSTOMER, role="Mainstream User", simulation=simulation, personality={"openness": 0.4, "skepticism": 0.6, "segment": "mainstream"}, behavior_rules=["Require proven value", "Price sensitive", "Compare alternatives", "Churn if product quality score < 0.6"]))
+    agents.append(create_agent(type=StakeholderType.CUSTOMER, role="Late Majority", simulation=simulation, personality={"openness": 0.2, "skepticism": 0.8, "segment": "laggard"}, behavior_rules=["Resist change", "Only adopt when necessary", "Demand simplicity", "Churn if product quality score < 0.8"]))
     agents.append(create_agent(type=StakeholderType.COMPETITOR, role="Incumbent", simulation=simulation, personality={"aggression": 0.6, "adaptability": 0.3}, behavior_rules=["Monitor market for new entrants", "Protect market share"]))
     if simulation.stage in [SimulationStage.MVP, SimulationStage.LAUNCH, SimulationStage.GROWTH]:
         role = "Angel Investor" if simulation.stage == SimulationStage.MVP else "VC Partner"
