@@ -110,6 +110,15 @@ def run_simulation(
         finally:
             kb.stop()
     console.print(f"[bold]Simulation finished at tick {engine.tick_count}.[/bold]")
+    report = engine.finalize()
+    console.print(Panel(
+        f"Interactions: {report['total_interactions']}\n"
+        f"Top Actions: {', '.join(f'{a[0]}({a[1]})' for a in report['top_actions'])}\n"
+        f"Strengths: {', '.join(report['strengths']) or 'None identified'}\n"
+        f"Weaknesses: {', '.join(report['weaknesses']) or 'None identified'}\n"
+        f"Recommendation: [bold]{report['recommendation']}[/bold]",
+        title="Critique Report", border_style="magenta"
+    ))
 
 @simulate_app.command("inspect")
 def inspect_simulation(

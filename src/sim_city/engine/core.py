@@ -8,6 +8,7 @@ from sim_city.models import SimulationEntity, SimulationRun, InteractionLog, Met
 from sim_city.events import EventBus
 from sim_city.agent.base import BaseAgent
 from sim_city.storage import StorageManager
+from sim_city.generation import calculate_basic_metrics, generate_critique_report
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,8 @@ class SimulationEngine:
             if interaction:
                 self.storage.log_interaction(interaction)
         self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time, "date": date_str}, self.current_time)
+        if self.tick_count % 10 == 0: # calculate metrics every 10 ticks
+            self._emit_metrics()
         if self.tick_count % 100 == 0:
             self.checkpoint()
     def checkpoint(self):
@@ -112,6 +115,20 @@ class SimulationEngine:
             logger.info(f"Restored from checkpoint at tick {self.tick_count}")
             return True
         return False
+    def _emit_metrics(self):
+        """Calculate and emit current metrics."""
+        interactions = self.storage.get_interactions(self.simulation.id)
+        metrics = calculate_basic_metrics(self.simulation, interactions, self.tick_count)
+        for metric_type, value in metrics.items():
+            snapshot = MetricSnapshot(simulation_id=self.simulation.id, timestamp=self.current_time, metric_type=metric_type, value=value)
+            self.storage.log_metric(snapshot)
+            self.event_bus.publish("metric_changed", {"metric_type": metric_type, "value": value}, self.current_time)
+        self._latest_metrics = metrics
+    def finalize(self) -> Dict[str, Any]:
+        """Generate end-of-simulation critique report."""
+        interactions = self.storage.get_interactions(self.simulation.id)
+        metrics = getattr(self, "_latest_metrics", calculate_basic_metrics(self.simulation, interactions, self.tick_count))
+        return generate_critique_report(self.simulation, interactions, metrics)
     def run_loop(self, max_ticks: Optional[int] = None):
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
