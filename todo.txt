@@ -3,7 +3,103 @@ Tech Stack: Python CLI (Typer/Rich), TinyDB/JSON, Ollama/Huggingface/LLM APIs, D
 Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization
 ================================================================================
 
---- PHASE 3: FULL FEATURE SET ---
+--- AUDIT: PHILOSOPHICAL ALIGNMENT (fulfill the original promise) ---
+
+# Wire orphaned modules into the simulation engine
+(B) Integrate MultiPhaseManager into SimulationEngine.step() so simulations auto-transition through idea->mvp->launch->growth->scale based on PHASE_THRESHOLDS and adoption metrics +feature +engine
+(B) Integrate EventGenerator into SimulationEngine.step() so crises, macro events, and disruptions fire probabilistically each tick, modifying world_state for agents to perceive +feature +engine
+(B) Integrate CompetitiveMarket into SimulationEngine so market share is contested by simulated competitors each tick, feeding results into world_state +feature +engine
+(B) Integrate seasonal multipliers from get_seasonal_multiplier() into metric calculation in SimulationEngine._emit_metrics() +feature +engine
+(B) Integrate CoalitionManager into SimulationEngine: run detect_coalitions() every 50 ticks using the existing RelationshipGraph, publish coalition events to event_bus +feature +engine
+(B) Integrate ConversationManager into SimulationEngine: trigger multi-turn conversations between allied agents (from RelationshipGraph.get_allies) every 25 ticks +feature +engine
+(B) Integrate DebateSession into SimulationEngine: trigger debates between agents with opposing positions (rivals from RelationshipGraph.get_rivals) every 50 ticks +feature +engine
+(B) Wire SentimentTracker.get_all_sentiments() into the dashboard by publishing sentiment data via event_bus every 10 ticks +feature +engine
+(B) Wire EmergenceDetector.get_flags() into the dashboard by publishing emergence flags via event_bus when new flags are detected +feature +engine
+(B) Wire ascii_relationship_graph() from visualization.py into the dashboard as a new panel showing live agent relationships +feature +dashboard
+(B) Wire ascii_sentiment_gauge() from visualization.py into the dashboard as a new panel showing per-agent sentiment bars +feature +dashboard
+
+# Fix MockProvider to produce meaningful simulations
+(B) Rewrite MockProvider.completion() to parse the agent prompt, extract agent type/role/personality traits, and return weighted-random actions consistent with the agent's personality instead of uniform random +feature +llm
+(B) Add personality-weighted action probabilities to MockProvider: customers favor buy/complain/post_review, investors favor invest/ignore, competitors favor compete/sell, regulators favor regulate/complain +feature +llm
+(B) Make MockProvider generate varied thought_process text based on agent role and action chosen, using template strings similar to generation.py patterns +feature +llm
+
+# Fix metrics to be driven by agent behavior
+(B) Refactor calculate_basic_metrics() to derive adoption_rate from cumulative positive agent actions (buy/invest/partner) relative to total agent count and ticks, not arbitrary normalization +refactor +engine
+(B) Refactor churn_rate calculation to track agents who previously took positive actions but switched to negative ones (complain/sell/ignore), making it a true behavioral churn metric +refactor +engine
+(B) Refactor market_share to integrate CompetitiveMarket simulation results instead of the current rough estimate formula +refactor +engine
+(B) Refactor burn_rate to be influenced by employee agent actions and simulation stage progression rather than static stage-based lookup with random variance +refactor +engine
+(B) Add revenue metric derived from buy-action count * configurable price-per-unit stored in SimulationEntity.parameters +feature +engine
+(B) Add runway_months metric calculated as (initial_capital - cumulative_burn) / monthly_burn_rate using parameters from TOML templates +feature +engine
+
+# Make agents feel differentiated
+(B) Wire the archetypes.py ARCHETYPES dict into engine/spawner.py: use archetype templates when creating agents instead of inline personality dicts, falling back to current behavior for unknown roles +refactor +agent
+(B) In GenericAgent.reason(), inject the agent's current relationship context (allies/rivals from RelationshipGraph) into the LLM prompt so agents reference their relationships +feature +agent
+(B) In GenericAgent.reason(), inject coalition membership into the prompt when the agent belongs to a coalition, so agents coordinate with coalition members +feature +agent
+(B) In GenericAgent.reason(), inject sentiment trend (rising/falling/stable from SentimentTracker) so agents are aware of how the market feels about the startup +feature +agent
+(B) Add a "memory reflection" step every 10 agent steps in GenericAgent.run_step(): summarize recent memories into a compact insight and prepend it to the memory list +feature +agent
+(B) In GenericAgent.perceive(), inject recent emergence flags and crisis/macro events from world_state so agents can react to market disruptions +feature +agent
+
+# Wire template parameters into simulation
+(B) In cli.py new_simulation(), read the [parameters] section from TOML templates and populate SimulationEntity.parameters with market_size, initial_capital, pricing_model, target_segment +feature +cli
+(B) Inject SimulationEntity.parameters into the world_state dict passed to agents each tick so agents can reference market_size, initial_capital, etc. in their decisions +feature +engine
+
+--- AUDIT: DX/UTILITY (developer experience and usability) ---
+
+# Security fix
+(B) Replace eval() in CustomMetricBuilder.calculate() with a safe expression parser: use ast.literal_eval or a simple operator-based evaluator that only allows arithmetic on metric variable names +security +refactor
+
+# Bug fixes
+(B) Fix difficulty scaling logic bug in agent/impl.py: the elif check for self.difficulty > 2.0 is unreachable because self.difficulty > 1.5 catches it first. Reverse the order so > 2.0 is checked before > 1.5 +bugfix +agent
+(B) Fix dashboard on_interaction() to display agent name instead of truncated UUID: look up agent name from self.agents list using agent_id from the event payload +bugfix +dashboard
+(B) Fix TinyDB connection leak: add db.close() calls after operations in TinyDBStorageManager methods that call _get_db(), or use a context manager pattern +bugfix +storage
+(B) Fix OllamaProvider to raise or return a structured error when the LLM returns an empty string, so GenericAgent.reason() can fall back gracefully instead of silently producing no action +bugfix +llm
+
+# Missing dependencies
+(B) Add fpdf2 as an optional dependency in pyproject.toml under [project.optional-dependencies] extras_require with key "pdf" so export_pdf_report works without breaking base install +infra
+
+# CLI usability improvements
+(B) Add a "simulate delete" CLI command that removes the TinyDB JSON file for a given simulation_id after user confirmation +feature +cli
+(B) Add a "simulate clone" CLI command that deep-copies a simulation's metadata and agents into a new simulation_id, enabling A/B testing of parameters +feature +cli
+(B) Add --json flag to "simulate status", "simulate list", and "simulate logs" commands for pipe-friendly JSON output using pipe_friendly_output() from export.py +feature +cli
+(B) Add --seed flag to "simulate run" that sets random.seed() and makes MockProvider deterministic, enabling reproducible simulations for demos +feature +cli
+(B) Improve the tutorial command to optionally auto-create and auto-run a sample simulation with mock provider for 20 ticks, printing results inline +feature +cli
+
+# Test infrastructure
+(B) Create tests/conftest.py with pytest fixtures: mock_storage (in-memory TinyDB), mock_llm (MockProvider), sample_simulation (SimulationEntity factory), sample_agents (list of AgentEntity) +infra +test
+(B) Create tests/test_models.py with unit tests for all model dataclasses: test to_dict/from_dict round-trip for AgentEntity, SimulationEntity, InteractionLog, MetricSnapshot, SimulationRun +infra +test
+(B) Create tests/test_engine.py: test SimulationEngine start/stop/pause/resume state transitions, test step() increments tick_count, test checkpoint/restore round-trip +infra +test
+(B) Create tests/test_agent.py: test GenericAgent perceive/reason/act with MockProvider, verify InteractionLog is produced, verify memory is updated +infra +test
+(B) Create tests/test_events.py: test EventBus subscribe/publish, test subscribe_all, test that handler exceptions don't crash the bus +infra +test
+(B) Create tests/test_storage.py: test TinyDBStorageManager CRUD operations using a temp directory, test list_simulations with multiple sims +infra +test
+(B) Create tests/test_analytics.py: test compare_simulations, risk_assessment, pattern_recognition with synthetic interaction/metric data +infra +test
+(B) Create tests/test_parsing.py: test extract_json with raw JSON, code-fenced JSON, embedded JSON in text, and invalid input +infra +test
+(B) Add a [tool.pytest.ini_options] section to pyproject.toml configuring testpaths=["tests"] and add pytest as a dev dependency +infra
+
+--- AUDIT: STABILITY/SCALING (production hardening) ---
+
+# Performance: fix O(n) growing cost per tick
+(B) Refactor SimulationEngine._emit_metrics() to count interactions incrementally (delta since last emission) instead of re-reading ALL interactions from TinyDB every 10 ticks +refactor +performance
+(B) Wire BatchWriter from performance.py into SimulationEngine: buffer interaction logs and flush in batches instead of writing each interaction individually to TinyDB +refactor +performance
+(B) Wire AgentPool from performance.py into SimulationEngine: use it to manage active agents when simulation has more than 20 agents, rotating inactive agents each tick +refactor +performance
+(B) Replace MemoryCache._access_order list with collections.OrderedDict to fix O(n) remove() calls on cache access +refactor +performance
+
+# Checkpoint completeness
+(B) Persist RelationshipGraph state in checkpoint() by serializing graph.to_dict() into simulation.parameters["relationships"] and restoring in restore_from_checkpoint() via graph.from_dict() +refactor +engine
+(B) Persist EmergenceDetector state (action_history and flags) in checkpoint() and restore in restore_from_checkpoint() +refactor +engine
+(B) Persist SentimentTracker._history in checkpoint() and restore in restore_from_checkpoint() +refactor +engine
+(B) Persist CoalitionManager state in checkpoint() and restore in restore_from_checkpoint() +refactor +engine
+
+# Async LLM support
+(B) Add an async_completion() abstract method to LLMProvider base class with a default implementation that wraps completion() in asyncio.to_thread() +feature +llm
+(B) Add async_completion() to OllamaProvider using httpx.AsyncClient for non-blocking LLM calls +feature +llm
+(B) Add a --parallel flag to "simulate run" that runs agent steps concurrently using asyncio.gather() on agent LLM calls within each tick +feature +engine
+
+# Error resilience
+(B) Add retry logic with exponential backoff (max 3 retries) to OllamaProvider.completion() and OpenAIProvider.completion() for transient HTTP errors (429, 500, 503) +feature +llm
+(B) Add a --max-failures flag to "simulate run" that stops the simulation if more than N consecutive agent steps produce invalid JSON responses +feature +engine
+(B) In SimulationEngine.step(), catch and log exceptions from individual agent.run_step() calls instead of letting one agent crash the entire simulation +bugfix +engine
+
+--- PHASE 3: FULL FEATURE SET (stretch goals, preserved from original) ---
 
 # Stretch Goals: Web UI & PostgreSQL
 (STRETCH) Implement PostgreSQL storage backend as alternative to TinyDB
