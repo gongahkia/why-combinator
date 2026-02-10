@@ -22,9 +22,19 @@ logger = logging.getLogger(__name__)
 
 class SimulationEngine:
     """Core simulation orchestrator."""
-    def __init__(self, simulation: SimulationEntity, storage: StorageManager):
+    def __init__(self, simulation: SimulationEntity, storage: StorageManager, seed: Optional[int] = None):
         self.simulation = simulation
         self.storage = storage
+        
+        # Handle RNG seeding for reproducibility
+        if seed is not None:
+            self.simulation.parameters["seed"] = seed
+        
+        sim_seed = self.simulation.parameters.get("seed")
+        if sim_seed is not None:
+            import random
+            random.seed(sim_seed)
+            logger.info(f"Simulation seeded with: {sim_seed}")
         self.event_bus = EventBus()
         self.agents: List[BaseAgent] = []
         self.current_time = simulation.created_at
