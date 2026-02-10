@@ -85,6 +85,7 @@ def run_simulation(
     model: str = typer.Option("ollama:llama3", help="LLM Provider (e.g. ollama:llama3, openai:gpt-4o)"),
     speed: float = typer.Option(1.0, help="Simulation speed multiplier"),
     duration: int = typer.Option(100, help="Number of ticks to run"),
+    resume: bool = typer.Option(False, help="Resume from last checkpoint"),
 ):
     """Run an existing simulation."""
     storage = TinyDBStorageManager()
@@ -125,7 +126,11 @@ def run_simulation(
             }
         )
         engine.spawn_agent(agent_instance)
-
+    if resume:
+        if engine.restore_from_checkpoint():
+            console.print(f"[green]Restored from checkpoint at tick {engine.tick_count}[/green]")
+        else:
+            console.print("[yellow]No checkpoint found, starting fresh.[/yellow]")
     # Event Listener for UI updates
     def on_tick(event: Event):
         # We can implement a richer UI here

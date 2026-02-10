@@ -93,11 +93,25 @@ class SimulationEngine:
     def checkpoint(self):
         self.simulation.parameters["current_time"] = self.current_time
         self.simulation.parameters["tick_count"] = self.tick_count
+        self.simulation.parameters["agent_memories"] = {a.entity.id: a.memory[-20:] for a in self.agents} # last 20 memories per agent
         db = self.storage._get_db(self.simulation.id)
         meta = db.table("metadata")
         meta.truncate()
         meta.insert(self.simulation.to_dict())
         logger.info(f"Checkpoint saved at tick {self.tick_count}")
+    def restore_from_checkpoint(self):
+        """Restore engine state from last checkpoint if available."""
+        params = self.simulation.parameters
+        if "current_time" in params:
+            self.current_time = params["current_time"]
+            self.tick_count = params.get("tick_count", 0)
+            agent_mems = params.get("agent_memories", {})
+            for agent in self.agents:
+                if agent.entity.id in agent_mems:
+                    agent.memory = agent_mems[agent.entity.id]
+            logger.info(f"Restored from checkpoint at tick {self.tick_count}")
+            return True
+        return False
     def run_loop(self, max_ticks: Optional[int] = None):
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
