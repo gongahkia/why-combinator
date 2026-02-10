@@ -4,6 +4,7 @@ from sim_city.llm.ollama import OllamaProvider
 from sim_city.llm.openai import OpenAIProvider
 from sim_city.llm.anthropic import AnthropicProvider
 from sim_city.llm.mock import MockProvider
+from sim_city.llm.huggingface import HuggingfaceProvider
 
 class LLMFactory:
     """Factory for creating LLM providers."""
@@ -30,6 +31,8 @@ class LLMFactory:
             return OpenAIProvider(model=model or "gpt-4o")
         elif provider_type == "anthropic":
             return AnthropicProvider(model=model or "claude-3-opus-20240229")
+        elif provider_type in ("huggingface", "hf"):
+            return HuggingfaceProvider(model=model or "mistralai/Mistral-7B-Instruct-v0.3")
         elif provider_type == "mock":
             return MockProvider()
         else:
