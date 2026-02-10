@@ -21,6 +21,7 @@ from sim_city.engine.spawner import generate_initial_agents
 from sim_city.agent.factory import create_agent_instance
 from sim_city.llm.factory import LLMFactory
 from sim_city.events import Event
+from sim_city.llm.cache import CachedLLMProvider
 
 # Configure logging
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -87,6 +88,7 @@ def run_simulation(
     duration: int = typer.Option(100, help="Number of ticks to run"),
     resume: bool = typer.Option(False, help="Resume from last checkpoint"),
     headless: bool = typer.Option(False, help="Headless mode - suppress interactive output"),
+    cache: bool = typer.Option(False, help="Cache LLM responses to disk"),
 ):
     """Run an existing simulation."""
     storage = TinyDBStorageManager()
@@ -103,6 +105,8 @@ def run_simulation(
     engine.speed_multiplier = speed
     try:
         llm = LLMFactory.create(model)
+        if cache:
+            llm = CachedLLMProvider(llm)
     except Exception as e:
         if not headless:
             console.print(f"[red]Failed to initialize LLM: {e}[/red]")
