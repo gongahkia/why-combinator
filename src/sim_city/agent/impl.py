@@ -43,13 +43,19 @@ class GenericAgent(BaseAgent):
             memory=self.get_recent_memories(limit=5),
             personality_summary=f"Be {self.entity.personality.get('dominant_trait', 'consistent')}."
         )
-        full_prompt = f"{sim_context_str}\n{identity_str}\n{prompt}"
+        goals_str = f"\nYOUR GOALS:\n{self.get_goals_summary()}\n" if self.goals else ""
+        strategy_str = f"\nYOUR STRATEGY: {self.strategy}\n" if self.strategy else ""
+        full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}\n{prompt}"
         response_text = self.llm_provider.completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
         decision = extract_json(response_text)
         if not decision:
             logger.warning(f"Agent {self.entity.id} produced invalid JSON: {response_text[:100]}...")
             decision = {"thought_process": "I am confused and will do nothing.", "action_type": "wait", "action_details": {}}
         self.add_memory(f"Thought: {decision.get('thought_process', '')}", role="internal")
+        if decision.get("new_goal"): # LLM can set goals
+            self.set_goal(decision["new_goal"], priority=decision.get("goal_priority", 0.5))
+        if decision.get("strategy_update"): # LLM can update strategy
+            self.set_strategy(decision["strategy_update"])
         return decision
     def act(self, decision: Dict[str, Any]) -> InteractionLog:
         action_type = decision.get("action_type", "wait")

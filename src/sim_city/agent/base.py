@@ -12,6 +12,8 @@ class BaseAgent(ABC):
         self.event_bus = event_bus
         self.memory: List[Dict[str, Any]] = []
         self.inbox: List[Dict[str, Any]] = [] # inter-agent messages
+        self.goals: List[Dict[str, Any]] = [] # agent goals: [{goal, priority, progress}]
+        self.strategy: str = "" # current high-level strategy
         self.event_bus.subscribe("agent_message", self._on_message)
     def _on_message(self, event):
         """Receive messages targeted at this agent."""
@@ -35,6 +37,19 @@ class BaseAgent(ABC):
         self.memory.append({"content": content, "role": role, "timestamp": timestamp})
     def get_recent_memories(self, limit: int = 5) -> str:
         return "\n".join(f"[{m['role']}] {m['content']}" for m in self.memory[-limit:])
+    def set_goal(self, goal: str, priority: float = 0.5):
+        self.goals.append({"goal": goal, "priority": priority, "progress": 0.0})
+        self.goals.sort(key=lambda g: g["priority"], reverse=True)
+    def update_goal_progress(self, goal_idx: int, progress: float):
+        if 0 <= goal_idx < len(self.goals):
+            self.goals[goal_idx]["progress"] = min(1.0, progress)
+    def get_goals_summary(self) -> str:
+        if not self.goals:
+            return "No explicit goals set."
+        return "\n".join(f"- [{g['progress']:.0%}] (P{g['priority']:.1f}) {g['goal']}" for g in self.goals)
+    def set_strategy(self, strategy: str):
+        self.strategy = strategy
+        self.add_memory(f"Strategy updated: {strategy}", role="strategy")
     @abstractmethod
     def perceive(self, world_state: Dict[str, Any]) -> Dict[str, Any]:
         pass
