@@ -3,6 +3,7 @@ import time
 import signal
 import threading
 import asyncio
+import atexit
 from datetime import datetime
 import logging
 from why_combinator.models import SimulationEntity, SimulationRun, InteractionLog, MetricSnapshot, WorldState
@@ -77,6 +78,8 @@ class SimulationEngine:
         self.event_generator = EventGenerator(self.event_bus)
         self.competitive_market = CompetitiveMarket()
         self._batch_writer = BatchWriter(storage)
+        # Register flush on exit to prevent data loss
+        atexit.register(self._batch_writer.flush)
         self._agent_pool: Optional[AgentPool] = None
         self._interaction_count_at_last_emit = 0
         self._cached_interactions: List[InteractionLog] = []
@@ -129,6 +132,7 @@ class SimulationEngine:
     def stop(self) -> None:
         self.is_running = False
         self.is_paused = False
+        atexit.unregister(self._batch_writer.flush)
         self._batch_writer.flush()
         logger.info(f"Simulation {self.simulation.id} stopped.")
         self.event_bus.publish("simulation_stopped", {"id": self.simulation.id}, self.current_time)
