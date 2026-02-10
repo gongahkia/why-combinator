@@ -183,10 +183,22 @@ class SimulationEngine:
         if self._agent_pool:
             self._agent_pool.rotate()
         for agent in active_agents:
+            import time as time_module
+            step_start = time_module.time()
             try:
                 interaction = agent.run_step(self.world_state, self.current_time)
+                step_duration_ms = (time_module.time() - step_start) * 1000
             except Exception as e:
-                logger.error(f"Agent {agent.entity.id} step failed: {e}")
+                step_duration_ms = (time_module.time() - step_start) * 1000
+                logger.error(
+                    f"Agent {agent.entity.id} step failed: {e}",
+                    extra={
+                        "simulation_id": self.simulation.id,
+                        "tick": self.tick_count,
+                        "agent_id": agent.entity.id,
+                        "duration_ms": step_duration_ms
+                    }
+                )
                 self._consecutive_failures += 1
                 if self._max_failures and self._consecutive_failures >= self._max_failures:
                     logger.error(f"Max failures ({self._max_failures}) reached, stopping simulation.")
@@ -200,6 +212,18 @@ class SimulationEngine:
                 self.relationships.update_from_interaction(interaction.agent_id, interaction.target, interaction.action)
                 self.emergence_detector.observe(interaction)
                 self.sentiment_tracker.record_action(interaction.agent_id, interaction.action, str(interaction.outcome), self.current_time)
+                
+                # Structured logging for agent steps
+                logger.debug(
+                    f"Agent {agent.entity.id} performed {interaction.action}",
+                    extra={
+                        "simulation_id": self.simulation.id,
+                        "tick": self.tick_count,
+                        "agent_id": agent.entity.id,
+                        "action_type": interaction.action,
+                        "duration_ms": step_duration_ms
+                    }
+                )
         self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time, "date": date_str}, self.current_time)
         
         # Call progress callback after each tick
