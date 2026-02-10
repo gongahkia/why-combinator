@@ -11,7 +11,7 @@ from why_combinator.events import EventBus
 
 class BaseAgent(ABC):
     """Abstract base class for simulation agents."""
-    def __init__(self, entity: AgentEntity, event_bus: EventBus):
+    def __init__(self, entity: AgentEntity, event_bus: EventBus, max_memory_size: int = 100, max_inbox_size: int = 50):
         self.entity = entity
         self.event_bus = event_bus
         self.memory: List[Dict[str, Any]] = []
@@ -22,6 +22,8 @@ class BaseAgent(ABC):
         self.difficulty: float = 1.0 # 1.0=baseline, increases over time
         self._steps_taken: int = 0
         self._invariants: List[Tuple[str, Callable[[InteractionLog, WorldState], bool]]] = [] 
+        self._max_memory_size = max_memory_size
+        self._max_inbox_size = max_inbox_size
         self.event_bus.subscribe("agent_message", self._on_message)
         
     def add_invariant(self, name: str, check: Callable[[InteractionLog, WorldState], bool]):
@@ -30,6 +32,10 @@ class BaseAgent(ABC):
     def _on_message(self, event):
         """Receive messages targeted at this agent."""
         if event.payload.get("target_id") == self.entity.id:
+            # Apply inbox cap: drop oldest if exceeded
+            if len(self.inbox) >= self._max_inbox_size:
+                dropped = self.inbox.pop(0)
+                logger.warning(f"Agent {self.entity.id} inbox full ({self._max_inbox_size}), dropped message from {dropped.get('sender_name', '?')}")
             self.inbox.append(event.payload)
             self.add_memory(f"Message from {event.payload.get('sender_name','?')}: {event.payload.get('content','')}", role="message", timestamp=event.timestamp)
     def send_message(self, target_id: str, content: str, timestamp: float = 0.0):
@@ -47,6 +53,43 @@ class BaseAgent(ABC):
         return msgs
     def add_memory(self, content: str, role: str = "observation", timestamp: float = 0.0):
         self.memory.append({"content": content, "role": role, "timestamp": timestamp})
+        # Check if memory eviction is needed
+        if len(self.memory) > self._max_memory_size:
+            self._evict_and_summarize_memory()
+    
+    def _evict_and_summarize_memory(self):
+        """Evict oldest memories and create summary when max size exceeded."""
+        # Calculate how many to evict (evict 30% when threshold hit)
+        evict_count = max(1, int(self._max_memory_size * 0.3))
+        to_summarize = self.memory[:evict_count]
+        
+        # Create summary of evicted memories
+        if to_summarize:
+            summary_text = self._create_memory_summary(to_summarize)
+            summary_entry = {
+                "content": f"[SUMMARY of {evict_count} old memories] {summary_text}",
+                "role": "summary",
+                "timestamp": to_summarize[-1].get("timestamp", 0.0)
+            }
+            # Remove old memories and prepend summary
+            self.memory = [summary_entry] + self.memory[evict_count:]
+            logger.debug(f"Agent {self.entity.id} evicted {evict_count} memories, created summary")
+    
+    def _create_memory_summary(self, memories: List[Dict[str, Any]]) -> str:
+        """Create a text summary of memories. Can be overridden for LLM-based summarization."""
+        # Simple rule-based summarization (subclasses can override for LLM)
+        roles = {}
+        for m in memories:
+            role = m.get("role", "other")
+            if role not in roles:
+                roles[role] = []
+            roles[role].append(m.get("content", "")[:50])
+        
+        parts = []
+        for role, contents in roles.items():
+            parts.append(f"{len(contents)} {role} events")
+        
+        return "; ".join(parts)
     def get_recent_memories(self, limit: int = 5) -> str:
         return "\n".join(f"[{m['role']}] {m['content']}" for m in self.memory[-limit:])
     def set_goal(self, goal: str, priority: float = 0.5):
@@ -75,7 +118,7 @@ class BaseAgent(ABC):
         self._steps_taken += 1
         if self._steps_taken % 20 == 0:
             self.difficulty = min(3.0, self.difficulty + 0.1)
-        # Memory reflection every 10 steps
+        # Memory reflection and eviction check every 10 steps
         if self._steps_taken % 10 == 0 and len(self.memory) >= 5:
             recent = self.memory[-10:]
             actions = [m["content"] for m in recent if m.get("role") == "internal"]

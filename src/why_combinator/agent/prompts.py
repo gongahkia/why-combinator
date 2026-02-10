@@ -70,3 +70,13 @@ Price: {price}
 Considering your needs and personality, do you buy it?
 Write a review or decision.
 """
+
+# Memory summarization prompt for LLM-based memory compression
+MEMORY_SUMMARIZATION_PROMPT = """
+Summarize the following {count} agent memories into a concise 2-3 sentence summary that captures the key events and patterns:
+
+MEMORIES:
+{memories}
+
+Provide only the summary, no additional commentary.
+"""

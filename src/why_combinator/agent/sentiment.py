@@ -17,11 +17,15 @@ def score_sentiment(text: str) -> float:
 
 class SentimentTracker:
     """Tracks sentiment per agent over time."""
-    def __init__(self):
+    def __init__(self, max_history_per_agent: int = 200):
         self._history: Dict[str, List[Tuple[float, float]]] = defaultdict(list) # agent_id -> [(timestamp, score)]
+        self._max_history_per_agent = max_history_per_agent
     def record(self, agent_id: str, text: str, timestamp: float):
         score = score_sentiment(text)
         self._history[agent_id].append((timestamp, score))
+        # Prune history if it exceeds max size
+        if len(self._history[agent_id]) > self._max_history_per_agent:
+            self._history[agent_id] = self._history[agent_id][-self._max_history_per_agent:]
     def record_action(self, agent_id: str, action: str, outcome_text: str, timestamp: float):
         combined = f"{action} {outcome_text}"
         self.record(agent_id, combined, timestamp)

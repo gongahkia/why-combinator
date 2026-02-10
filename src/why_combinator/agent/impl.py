@@ -1,19 +1,19 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 import json
 from why_combinator.models import AgentEntity, InteractionLog, WorldState, InteractionOutcome
 from why_combinator.events import EventBus
 from why_combinator.agent.base import BaseAgent
 from why_combinator.llm.base import LLMProvider
-from why_combinator.agent.prompts import SIMULATION_CONTEXT, AGENT_IDENTITY, DECISION_PROMPT, PromptTemplate
+from why_combinator.agent.prompts import SIMULATION_CONTEXT, AGENT_IDENTITY, DECISION_PROMPT, MEMORY_SUMMARIZATION_PROMPT, PromptTemplate
 from why_combinator.utils.parsing import extract_json
 
 logger = logging.getLogger(__name__)
 
 class GenericAgent(BaseAgent):
     """Generic LLM-driven agent. Behavior determined by entity role/type/prompts."""
-    def __init__(self, entity: AgentEntity, event_bus: EventBus, llm_provider: LLMProvider, world_context: Dict[str, Any]):
-        super().__init__(entity, event_bus)
+    def __init__(self, entity: AgentEntity, event_bus: EventBus, llm_provider: LLMProvider, world_context: Dict[str, Any], max_memory_size: int = 100, max_inbox_size: int = 50):
+        super().__init__(entity, event_bus, max_memory_size, max_inbox_size)
         self.llm_provider = llm_provider
         self.world_context = world_context
         
@@ -35,6 +35,28 @@ class GenericAgent(BaseAgent):
             return False
             
         return True
+    
+    def _create_memory_summary(self, memories: List[Dict[str, Any]]) -> str:
+        """Use LLM to create intelligent memory summary."""
+        # Format memories for summarization
+        memory_text = "\n".join(
+            f"[{m.get('role', 'unknown')}] {m.get('content', '')}" 
+            for m in memories
+        )
+        
+        prompt = MEMORY_SUMMARIZATION_PROMPT.format(
+            count=len(memories),
+            memories=memory_text
+        )
+        
+        # Use sync completion (this is called during memory management, not in main loop)
+        try:
+            summary = self.llm_provider.completion(prompt, system_prompt="You are a memory summarization assistant.")
+            return summary.strip() if summary else super()._create_memory_summary(memories)
+        except Exception as e:
+            logger.warning(f"LLM summarization failed: {e}, using rule-based fallback")
+            return super()._create_memory_summary(memories)
+    
     def perceive(self, world_state: WorldState) -> Dict[str, Any]:
         perception = dict(world_state.metrics) if world_state.metrics else {}
         perception["date"] = world_state.date
