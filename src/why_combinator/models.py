@@ -47,6 +47,7 @@ class MarketParams:
     competitor_quality_avg: float = 0.5
     retention_half_life: float = 200.0
     inflection_tick: int = 100
+    growth_modifier: float = 1.0
     revenue_model: str = "transactional"
     investor_burn_limit: float = 15.0
 

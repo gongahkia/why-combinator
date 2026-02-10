@@ -144,7 +144,8 @@ def calculate_basic_metrics(simulation: SimulationEntity, interactions: List[Int
         competitor_count=int(params.get("competitor_count", 3)),
         competitor_quality_avg=float(params.get("competitor_quality_avg", 0.5)),
         retention_half_life=float(params.get("retention_half_life", 200.0)),
-        inflection_tick=int(params.get("inflection_tick", 100))
+        inflection_tick=int(params.get("inflection_tick", 100)),
+        growth_modifier=float(params.get("growth_modifier", 1.0))
     )
     
     adoption_rate = calculate_adoption_rate(market_params, tick_count)

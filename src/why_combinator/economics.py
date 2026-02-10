@@ -7,6 +7,7 @@ from why_combinator.models import InteractionLog, MarketParams, UnitEconomics, F
 def calculate_adoption_rate(params: MarketParams, tick_count: int) -> float:
     """Calculate adoption rate using logistic S-curve."""
     k = (params.viral_coefficient * 0.5) + (params.conversion_rate * 2.0)
+    k *= params.growth_modifier
     t0 = params.inflection_tick
     try:
         return 1.0 / (1.0 + math.exp(-k * (tick_count - t0)))

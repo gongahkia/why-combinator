@@ -23,7 +23,7 @@ from why_combinator.agent.sentiment import SentimentTracker
 from why_combinator.agent.coalition import CoalitionManager
 from why_combinator.agent.conversation import ConversationManager
 from why_combinator.agent.debate import DebateSession
-from why_combinator.engine.scenarios import MultiPhaseManager, EventGenerator, CompetitiveMarket, get_seasonal_multiplier
+from why_combinator.engine.scenarios import MultiPhaseManager, EventGenerator, CompetitiveMarket, get_seasonal_multiplier, MarketSaturation
 from why_combinator.engine.performance import BatchWriter, AgentPool
 
 logger = logging.getLogger(__name__)
@@ -265,6 +265,14 @@ class SimulationEngine:
         self._batch_writer.flush()
         # Use cached interactions for incremental metric calculation
         interactions = self._cached_interactions
+        
+        # Calculate Growth Modifier based on previous metrics and saturation
+        latest = getattr(self, "_latest_metrics", {})
+        share = latest.get("market_share", 0.1)
+        adoption = latest.get("adoption_rate", 0.0)
+        modifier = MarketSaturation.calculate_growth_modifier(share, adoption)
+        self.simulation.parameters["growth_modifier"] = modifier
+        
         metrics = calculate_basic_metrics(self.simulation, interactions, self.tick_count)
         # Apply seasonal multipliers
         seasonal = get_seasonal_multiplier(self.tick_count)

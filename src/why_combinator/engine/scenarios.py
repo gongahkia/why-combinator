@@ -123,3 +123,24 @@ class PivotScenario:
         reputation_hit = min(self.pivot_count * 0.1, 0.5) # each pivot costs more reputation
         simulation.description = new_description
         return {"pivot_number": self.pivot_count, "reputation_cost": reputation_hit, "new_direction": new_description}
+
+class MarketSaturation:
+    """Models the dampening effect of market saturation on growth."""
+    @staticmethod
+    def calculate_growth_modifier(market_share: float, penetration: float) -> float:
+        """
+        Calculate growth modifier (0.0 - 1.0).
+        As market_share approaches 1.0 (monopoly) or penetration approaches 1.0 (fully saturated),
+        growth becomes harder.
+        """
+        # Saturation penalty
+        saturation_penalty = 1.0
+        if penetration > 0.8:
+            saturation_penalty = max(0.0, 1.0 - (penetration - 0.8) * 2.0) # 0.8->1.0, 1.0->0.6
+            
+        # Dominance penalty (harder to grow when you afford everyone)
+        dominance_penalty = 1.0
+        if market_share > 0.7:
+             dominance_penalty = max(0.0, 1.0 - (market_share - 0.7)) # 0.7->1.0, 1.0->0.7
+             
+        return min(saturation_penalty, dominance_penalty)
