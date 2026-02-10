@@ -19,6 +19,7 @@ from sim_city.llm.factory import LLMFactory
 from sim_city.llm.cache import CachedLLMProvider
 from sim_city.events import Event
 from sim_city.dashboard import SimulationDashboard, KeyboardListener
+from sim_city.agent.learning import inject_lessons_into_agent
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 app = typer.Typer(name="sim-city", help="AI-powered startup simulation engine.", add_completion=True, rich_markup_mode="rich")
@@ -85,6 +86,8 @@ def run_simulation(
             world_context={"id": simulation.id, "name": simulation.name, "description": simulation.description, "industry": simulation.industry, "stage": simulation.stage.value}
         )
         engine.spawn_agent(agent_instance)
+    for agent in engine.agents: # inject lessons from past runs
+        inject_lessons_into_agent(agent, storage, simulation_id)
     if resume:
         restored = engine.restore_from_checkpoint()
         if not headless:
