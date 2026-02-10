@@ -150,6 +150,66 @@ def run_simulation(
         engine.stop()
 
 
+@simulate_app.command("inspect")
+def inspect_simulation(
+    simulation_id: str = typer.Argument(..., help="ID of the simulation"),
+    agent_id: Optional[str] = typer.Option(None, help="Specific Agent ID to inspect")
+):
+    """Inspect simulation details or a specific agent."""
+    storage = TinyDBStorageManager()
+    simulation = storage.get_simulation(simulation_id)
+    if not simulation:
+        console.print(f"[red]Simulation {simulation_id} not found[/red]")
+        raise typer.Exit(1)
+        
+    if agent_id:
+        agents = storage.get_agents(simulation_id)
+        agent = next((a for a in agents if a.id == agent_id), None)
+        if not agent:
+            console.print(f"[red]Agent {agent_id} not found[/red]")
+            return
+            
+        console.print(Panel(f"[bold]{agent.name}[/bold]\nRole: {agent.role}\nType: {agent.type.value}", title="Agent Details"))
+        console.print(f"Personality: {agent.personality}")
+        console.print(f"Knowledge: {agent.knowledge_base}")
+    else:
+        status_simulation(simulation_id)
+
+
+@simulate_app.command("status")
+def status_simulation(simulation_id: str):
+    """Show status of a simulation."""
+    storage = TinyDBStorageManager()
+    simulation = storage.get_simulation(simulation_id)
+    if not simulation:
+        console.print(f"[red]Simulation {simulation_id} not found[/red]")
+        raise typer.Exit(1)
+
+    agents = storage.get_agents(simulation_id)
+    
+    console.print(Panel(
+        f"ID: {simulation.id}\n"
+        f"Name: {simulation.name}\n"
+        f"Industry: {simulation.industry}\n"
+        f"Stage: {simulation.stage.value}\n"
+        f"Created: {datetime.fromtimestamp(simulation.created_at)}\n"
+        f"Agents: {len(agents)}",
+        title="Simulation Status"
+    ))
+    
+    # List agents
+    table = Table(title="Agents")
+    table.add_column("ID", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Role")
+    table.add_column("Type")
+    
+    for agent in agents:
+        table.add_row(agent.id, agent.name, agent.role, agent.type.value)
+    
+    console.print(table)
+
+
 @simulate_app.command("list")
 def list_simulations():
     """List all simulations."""
