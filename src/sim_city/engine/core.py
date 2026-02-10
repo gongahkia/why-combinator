@@ -87,7 +87,7 @@ class SimulationEngine:
             interaction = agent.run_step(self.world_state, self.current_time)
             if interaction:
                 self.storage.log_interaction(interaction)
-        self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time}, self.current_time)
+        self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time, "date": date_str}, self.current_time)
         if self.tick_count % 100 == 0:
             self.checkpoint()
     def checkpoint(self):
