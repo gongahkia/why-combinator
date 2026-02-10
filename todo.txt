@@ -5,11 +5,6 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 # DX/Utility: Library API, PyPI, CLI
 
-(B) Add full type annotations to all LLM provider classes (completion, chat_completion return types; error union types) +refactor
-(B) Replace Dict[str,Any] world_state with a typed WorldState dataclass in models.py containing date, timestamp, stage, agents, metrics, events +refactor
-(B) Replace Dict[str,Any] interaction outcome with typed InteractionOutcome dataclass (thought_process, action_type, target, details, confidence) +refactor
-(B) Add ProgressCallback protocol in api.py: on_tick(tick, metrics), on_phase_change(phase), on_complete(summary) for library consumers +feature
-(B) Wire ProgressCallback into SimulationEngine.step() as optional injection alongside EventBus +feature
 (B) Add pyproject.toml metadata: license, classifiers (Development Status, Topic, Python version), project-urls (homepage, repository, issues) +infra
 (B) Add pyproject.toml long_description pointing to README.md with content-type text/markdown for PyPI page +infra
 (B) Add version string to src/why_combinator/__init__.py and wire __version__ for programmatic access +infra

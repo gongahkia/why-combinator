@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 import time
 import signal
 import threading
@@ -26,13 +26,17 @@ from why_combinator.agent.debate import DebateSession
 from why_combinator.engine.scenarios import MultiPhaseManager, EventGenerator, CompetitiveMarket, get_seasonal_multiplier, MarketSaturation
 from why_combinator.engine.performance import BatchWriter, AgentPool
 
+if TYPE_CHECKING:
+    from why_combinator.api import ProgressCallback
+
 logger = logging.getLogger(__name__)
 
 class SimulationEngine:
     """Core simulation orchestrator."""
-    def __init__(self, simulation: SimulationEntity, storage: StorageManager, seed: Optional[int] = None):
+    def __init__(self, simulation: SimulationEntity, storage: StorageManager, seed: Optional[int] = None, progress_callback: Optional["ProgressCallback"] = None):
         self.simulation = simulation
         self.storage = storage
+        self.progress_callback = progress_callback
         
         # Handle RNG seeding for reproducibility
         if seed is not None:
@@ -197,6 +201,11 @@ class SimulationEngine:
                 self.emergence_detector.observe(interaction)
                 self.sentiment_tracker.record_action(interaction.agent_id, interaction.action, str(interaction.outcome), self.current_time)
         self.event_bus.publish("tick", {"tick": self.tick_count, "time": self.current_time, "date": date_str}, self.current_time)
+        
+        # Call progress callback after each tick
+        if self.progress_callback and hasattr(self.progress_callback, 'on_tick'):
+            self.progress_callback.on_tick(self.tick_count, getattr(self, "_latest_metrics", {}))
+        
         if self.tick_count % 10 == 0:
             self._emit_metrics()
             # Publish sentiment data to dashboard
@@ -207,7 +216,10 @@ class SimulationEngine:
                 self.event_bus.publish("emergence_flags", {"flags": new_flags}, self.current_time)
             # MultiPhaseManager: check phase transitions
             metrics = getattr(self, "_latest_metrics", {})
+            old_stage = self.simulation.stage
             self.phase_manager.check_transition(self.tick_count, metrics)
+            if self.simulation.stage != old_stage and self.progress_callback and hasattr(self.progress_callback, 'on_phase_change'):
+                self.progress_callback.on_phase_change(self.simulation.stage.value)
         # CoalitionManager: detect coalitions every 50 ticks
         if self.tick_count % 50 == 0:
             agent_ids = [a.entity.id for a in self.agents]
@@ -310,7 +322,13 @@ class SimulationEngine:
         self._batch_writer.flush()
         interactions = self._cached_interactions or self.storage.get_interactions(self.simulation.id)
         metrics = getattr(self, "_latest_metrics", calculate_basic_metrics(self.simulation, interactions, self.tick_count))
-        return generate_critique_report(self.simulation, interactions, metrics)
+        summary = generate_critique_report(self.simulation, interactions, metrics)
+        
+        # Call progress callback on completion
+        if self.progress_callback and hasattr(self.progress_callback, 'on_complete'):
+            self.progress_callback.on_complete(summary)
+        
+        return summary
     def run_loop(self, max_ticks: Optional[int] = None) -> None:
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
