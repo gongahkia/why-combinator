@@ -432,5 +432,28 @@ def tutorial(
         console.print(f"  Recommendation: [bold]{report['recommendation']}[/bold]")
         console.print(f"\n[dim]Explore with: why-combinator simulate status {sim.id}[/dim]")
 
+
+@app.command("migrate")
+def migrate_storage(
+    from_backend: str = typer.Option(..., "--from", help="Source storage backend (tinydb)"),
+    to_backend: str = typer.Option(..., "--to", help="Destination storage backend (sqlite)"),
+):
+    """Migrate simulation data between storage backends."""
+    if from_backend == "tinydb" and to_backend == "sqlite":
+        console.print("[cyan]Migrating from TinyDB to SQLite...[/cyan]")
+        from why_combinator.storage import migrate_tinydb_to_sqlite
+        try:
+            migrate_tinydb_to_sqlite()
+            console.print("[green]Migration completed successfully![/green]")
+        except Exception as e:
+            console.print(f"[red]Migration failed: {e}[/red]")
+            raise typer.Exit(1)
+    else:
+        console.print(f"[red]Unsupported migration: {from_backend} -> {to_backend}[/red]")
+        console.print("[yellow]Currently supported: --from tinydb --to sqlite[/yellow]")
+        raise typer.Exit(1)
+
+
 if __name__ == "__main__":
     app()
+

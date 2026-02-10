@@ -25,6 +25,9 @@ HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 # Model Config
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 
+# Storage Config
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "sqlite")  # "tinydb" or "sqlite"
+
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FORMAT = os.getenv("LOG_FORMAT", "human")  # "human" or "json"

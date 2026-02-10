@@ -52,6 +52,11 @@ class StorageManager(ABC):
     def get_metrics(self, simulation_id: str) -> List[MetricSnapshot]:
         pass
 
+    @abstractmethod
+    def query_metrics(self, metric_type: Optional[str] = None, simulation_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Query metrics across simulations with optional filters. Returns aggregated statistics."""
+        pass
+
 
 class TinyDBStorageManager(StorageManager):
     """Implementation of StorageManager using TinyDB with one file per simulation."""
@@ -147,6 +152,54 @@ class TinyDBStorageManager(StorageManager):
         result = [MetricSnapshot(**r) for r in metrics_table.all()]
         db.close()
         return result
+
+    def query_metrics(self, metric_type: Optional[str] = None, simulation_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Query metrics across simulations. Returns aggregated statistics."""
+        import statistics
+        all_metrics = []
+        
+        # Get simulations to query
+        target_sims = simulation_ids if simulation_ids else [s.id for s in self.list_simulations()]
+        
+        for sim_id in target_sims:
+            if not self._get_db_path(sim_id).exists():
+                continue
+            db = self._get_db(sim_id)
+            metrics_table = db.table('metrics')
+            if metric_type:
+                all_metrics.extend([MetricSnapshot(**r) for r in metrics_table.search(where('metric_type') == metric_type)])
+            else:
+                all_metrics.extend([MetricSnapshot(**r) for r in metrics_table.all()])
+            db.close()
+        
+        if not all_metrics:
+            return {"count": 0, "metrics": []}
+        
+        # Group by metric type
+        by_type: Dict[str, List[float]] = {}
+        for m in all_metrics:
+            if m.metric_type not in by_type:
+                by_type[m.metric_type] = []
+            by_type[m.metric_type].append(m.value)
+        
+        # Calculate statistics
+        stats = {}
+        for mtype, values in by_type.items():
+            stats[mtype] = {
+                "count": len(values),
+                "mean": statistics.mean(values) if values else 0,
+                "median": statistics.median(values) if values else 0,
+                "stdev": statistics.stdev(values) if len(values) > 1 else 0,
+                "min": min(values) if values else 0,
+                "max": max(values) if values else 0
+            }
+        
+        return {
+            "count": len(all_metrics),
+            "simulations_queried": len(target_sims),
+            "metric_types": list(by_type.keys()),
+            "statistics": stats
+        }
 
 
 class SqliteStorageManager(StorageManager):
@@ -423,4 +476,126 @@ class SqliteStorageManager(StorageManager):
             )
             for row in rows
         ]
+
+    def query_metrics(self, metric_type: Optional[str] = None, simulation_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Query metrics across simulations with SQL aggregation."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        
+        # Build query
+        query = """
+            SELECT 
+                metric_type,
+                COUNT(*) as count,
+                AVG(value) as mean,
+                MIN(value) as min,
+                MAX(value) as max,
+                COUNT(DISTINCT sim_id) as sim_count
+            FROM metrics
+            WHERE 1=1
+        """
+        params = []
+        
+        if metric_type:
+            query += " AND metric_type = ?"
+            params.append(metric_type)
+        
+        if simulation_ids:
+            placeholders = ",".join("?" * len(simulation_ids))
+            query += f" AND sim_id IN ({placeholders})"
+            params.extend(simulation_ids)
+        
+        query += " GROUP BY metric_type"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        # Get total count
+        count_query = "SELECT COUNT(*) as total FROM metrics WHERE 1=1"
+        count_params = []
+        if metric_type:
+            count_query += " AND metric_type = ?"
+            count_params.append(metric_type)
+        if simulation_ids:
+            placeholders = ",".join("?" * len(simulation_ids))
+            count_query += f" AND sim_id IN ({placeholders})"
+            count_params.extend(simulation_ids)
+        
+        cursor.execute(count_query, count_params)
+        total_count = cursor.fetchone()["total"]
+        
+        conn.close()
+        
+        # Calculate standard deviation manually (SQLite doesn't have STDDEV)
+        stats = {}
+        for row in rows:
+            mtype = row["metric_type"]
+            stats[mtype] = {
+                "count": row["count"],
+                "mean": row["mean"],
+                "min": row["min"],
+                "max": row["max"],
+                "stdev": 0  # Would need second pass to calculate
+            }
+        
+        return {
+            "count": total_count,
+            "simulations_queried": row["sim_count"] if rows else 0,
+            "metric_types": list(stats.keys()),
+            "statistics": stats
+        }
+
+
+def get_storage_manager(backend: Optional[str] = None) -> StorageManager:
+    """Factory function to create storage manager based on config."""
+    from why_combinator.config import STORAGE_BACKEND
+    
+    backend_type = backend or STORAGE_BACKEND
+    
+    if backend_type == "sqlite":
+        return SqliteStorageManager()
+    elif backend_type == "tinydb":
+        return TinyDBStorageManager()
+    else:
+        raise ValueError(f"Unknown storage backend: {backend_type}. Must be 'sqlite' or 'tinydb'.")
+
+
+def migrate_tinydb_to_sqlite(source_dir: Optional[Path] = None, dest_dir: Optional[Path] = None) -> None:
+    """Migrate data from TinyDB to SQLite storage backend."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    source_storage = TinyDBStorageManager(source_dir or SIMULATIONS_DIR)
+    dest_storage = SqliteStorageManager(dest_dir or SIMULATIONS_DIR)
+    
+    simulations = source_storage.list_simulations()
+    logger.info(f"Found {len(simulations)} simulations to migrate")
+    
+    for sim in simulations:
+        logger.info(f"Migrating simulation: {sim.id} - {sim.name}")
+        
+        # Create simulation in SQLite
+        dest_storage.create_simulation(sim)
+        
+        # Migrate agents
+        agents = source_storage.get_agents(sim.id)
+        for agent in agents:
+            dest_storage.save_agent(sim.id, agent)
+        logger.info(f"  Migrated {len(agents)} agents")
+        
+        # Migrate interactions
+        interactions = source_storage.get_interactions(sim.id)
+        for interaction in interactions:
+            dest_storage.log_interaction(interaction)
+        logger.info(f"  Migrated {len(interactions)} interactions")
+        
+        # Migrate metrics
+        metrics = source_storage.get_metrics(sim.id)
+        for metric in metrics:
+            dest_storage.log_metric(metric)
+        logger.info(f"  Migrated {len(metrics)} metrics")
+    
+    logger.info(f"Migration complete: {len(simulations)} simulations migrated to SQLite")
+
+
 
