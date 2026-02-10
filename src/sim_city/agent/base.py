@@ -14,6 +14,8 @@ class BaseAgent(ABC):
         self.inbox: List[Dict[str, Any]] = [] # inter-agent messages
         self.goals: List[Dict[str, Any]] = [] # agent goals: [{goal, priority, progress}]
         self.strategy: str = "" # current high-level strategy
+        self.difficulty: float = 1.0 # 1.0=baseline, increases over time
+        self._steps_taken: int = 0
         self.event_bus.subscribe("agent_message", self._on_message)
     def _on_message(self, event):
         """Receive messages targeted at this agent."""
@@ -60,6 +62,9 @@ class BaseAgent(ABC):
     def act(self, decision: Dict[str, Any]) -> InteractionLog:
         pass
     def run_step(self, world_state: Dict[str, Any], timestamp: float) -> Optional[InteractionLog]:
+        self._steps_taken += 1
+        if self._steps_taken % 20 == 0: # scale difficulty every 20 steps
+            self.difficulty = min(3.0, self.difficulty + 0.1)
         perception = self.perceive(world_state)
         decision = self.reason(perception)
         interaction = self.act(decision)

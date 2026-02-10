@@ -45,7 +45,12 @@ class GenericAgent(BaseAgent):
         )
         goals_str = f"\nYOUR GOALS:\n{self.get_goals_summary()}\n" if self.goals else ""
         strategy_str = f"\nYOUR STRATEGY: {self.strategy}\n" if self.strategy else ""
-        full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}\n{prompt}"
+        difficulty_str = ""
+        if self.difficulty > 1.5:
+            difficulty_str = "\nYou are now more experienced and sophisticated. Be more strategic, consider second-order effects, and make nuanced decisions.\n"
+        elif self.difficulty > 2.0:
+            difficulty_str = "\nYou are a veteran in this market. Think multiple moves ahead, consider game theory, and exploit market inefficiencies.\n"
+        full_prompt = f"{sim_context_str}\n{identity_str}{goals_str}{strategy_str}{difficulty_str}\n{prompt}"
         response_text = self.llm_provider.completion(prompt=full_prompt, system_prompt="You are a role-playing agent in a business simulation.")
         decision = extract_json(response_text)
         if not decision:
