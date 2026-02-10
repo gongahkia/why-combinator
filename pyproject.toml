@@ -1,0 +1,27 @@
+[project]
+name = "sim-city"
+version = "0.1.0"
+description = "AI-powered startup simulation engine"
+authors = [
+    {name = "gongahkia"}
+]
+readme = "README.md"
+requires-python = "^3.11"
+dependencies = [
+    "typer (>=0.21.1,<0.22.0)",
+    "rich (>=14.3.2,<15.0.0)",
+    "tinydb (>=4.8.2,<5.0.0)",
+    "httpx (>=0.28.1,<0.29.0)"
+]
+
+
+[tool.poetry.scripts]
+sim-city = "sim_city.cli:app"
+
+[tool.poetry.packages]
+include = "sim_city"
+from = "src"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
