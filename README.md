@@ -14,17 +14,17 @@
 * *Testing*: [pytest](https://docs.pytest.org/), [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio), [mypy](https://mypy-lang.org/)
 * *CI/CD*: [GitHub Actions](https://github.com/features/actions)
 
-## What `Why-Combinator` can do *([currently](https://github.com/gongahkia/why-combinator/issues))*
+## What `Why-Combinator` can do *([for now](https://github.com/gongahkia/why-combinator/issues))*
 
 * **Multi-agent simulation**: 11 stakeholder archetypes *(customer, investor, competitor, regulator, employee, partner, critic, media, supplier, advisor)* with LLM-driven reasoning
 * **Startup templates**: Pre-built scenarios for SaaS, fintech, marketplace and hardware startups
-* **Economic modeling**: CAC, LTV, burn rate, runway, churn, retention, market share and revenue models (subscription, transaction, one-time)
+a* **Economic modeling**: CAC, LTV, burn rate, runway, churn, retention, market share and revenue models *(subscription, transaction, one-time)*
 * **Live TUI dashboard**: Real-time Rich-based dashboard with metrics, agent roster, event log and sentiment indicators
 * **Agent relationships**: Relationship graphs, coalition detection, sentiment tracking, emergence detection and debate sessions
-* **Simulation lifecycle**: Multi-phase transitions (idea, MVP, launch, growth, scale, exit) with seasonal multipliers and market saturation
+* **Simulation lifecycle**: Multi-phase transitions *(idea, MVP, launch, growth, scale, exit)* with seasonal multipliers and market saturation
 * **Checkpointing**: Save/resume simulations, reproducible runs via seed, LLM response caching
 * **Analytics**: Compare multiple simulations, custom metric builders, scenario branching
-* **Programmatic API**: Python API via `why_combinator.api` with `ProgressCallback` protocol for headless/batch usage
+* **API**: Python-first API via `why_combinator.api` with `ProgressCallback` protocol for headless/batch usage
 
 ## Screenshots
 
