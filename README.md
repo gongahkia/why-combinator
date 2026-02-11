@@ -109,8 +109,10 @@ $ pytest tests/
 
 ## Architecture
 
-...
+<div align="center">
+    <img src="./asset/reference/architecture.png">
+</div>
 
 ## Reference
 
-The name `Why-Combinator` is a play on [Y Combinator](https://www.ycombinator.com/), the renowned startup accelerator. Where YC nurtures real startups, Why-Combinator asks *"why?"* and simulates the answers.
+The name `Why-Combinator` is in reference to the startup accelerator [Y Combinator](https://www.ycombinator.com/). 
