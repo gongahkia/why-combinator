@@ -34,10 +34,15 @@ dependencies = [
 
 [project.optional-dependencies]
 pdf = ["fpdf2>=2.7.0"]
-dev = ["pytest>=7.0.0"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.23.0",
+    "mypy>=1.0.0"
+]
 
 [project.scripts]
 why-combinator = "why_combinator.cli:app"
+why-check = "why_combinator.scripts.check:main"
 
 [project.readme]
 file = "README.md"
@@ -48,6 +53,8 @@ packages = [{include = "why_combinator", from = "src"}]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
