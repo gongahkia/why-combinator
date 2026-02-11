@@ -1,4 +1,4 @@
-name: CI
+name: Why-Combinator CI/CD on push
 on:
   push:
     branches: [main]
