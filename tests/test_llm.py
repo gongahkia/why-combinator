@@ -120,6 +120,35 @@ def test_cached_llm_determinism(tmp_path):
         # Call count should STILL be 1 (metrics/logs might show hit)
         assert mock_provider.completion.call_count == 1
 
+
+def test_llm_factory_fallback():
+    """Test fallback chain: OpenAI (fails) -> Ollama (success)."""
+    # Mock ConfigError when creating OpenAI
+    with patch("why_combinator.llm.factory.OpenAIProvider", side_effect=ConfigError("No Key")):
+        # Mock successful Ollama creation
+        with patch("why_combinator.llm.factory.OllamaProvider") as mock_ollama:
+             mock_instance = MagicMock()
+             mock_ollama.return_value = mock_instance
+             
+             # Call create with OpenAI spec
+             provider = LLMFactory.create("openai:gpt-4")
+             
+             # Should return the Ollama instance
+             assert provider == mock_instance
+             # Should have logged warning (can't easily check without log capture, but behavior confirms)
+
+def test_llm_factory_fallback_to_mock():
+    """Test fallback chain: OpenAI (fails) -> Ollama (fails) -> Mock (success)."""
+    with patch("why_combinator.llm.factory.OpenAIProvider", side_effect=ConfigError("No Key")):
+        with patch("why_combinator.llm.factory.OllamaProvider", side_effect=ConfigError("No Ollama")):
+            with patch("why_combinator.llm.factory.MockProvider") as mock_mock:
+                mock_instance = MagicMock()
+                mock_mock.return_value = mock_instance
+                
+                provider = LLMFactory.create("openai:gpt-4")
+                
+                assert provider == mock_instance
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main(["-v", __file__]))
