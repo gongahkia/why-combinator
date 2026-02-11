@@ -44,10 +44,6 @@ dev = [
 why-combinator = "why_combinator.cli:app"
 why-check = "why_combinator.scripts.check:main"
 
-[project.readme]
-file = "README.md"
-content-type = "text/markdown"
-
 [tool.poetry]
 packages = [{include = "why_combinator", from = "src"}]
 
