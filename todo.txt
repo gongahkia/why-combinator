@@ -16,11 +16,8 @@ Philosophy: Backend-first, local-first, CLI-driven with ASCII visualization. Res
 
 
 
-(B) Add test: BatchWriter flushes all buffered interactions on explicit flush() call +test
-(B) Add test: AgentPool rotates agents correctly when pool size exceeds active limit +test
-(B) Add test: ExperimentConfig diff correctly identifies changed variables between two configs +test
-(B) Add test: cross-simulation metric aggregation returns correct mean/stddev across 3 mock sims +test
-(B) Add test: market saturation mechanic reduces adoption growth rate as market_share approaches TAM +test
+
+
 (B) Add test: agent memory eviction keeps max_memory_size entries and summarizes overflow +test
 (B) Add test: LLM provider fallback chain activates mock when no API keys are configured +test
 (B) Add pytest-asyncio to dev dependencies and async test fixtures for async engine tests +test +infra
