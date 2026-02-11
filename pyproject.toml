@@ -18,12 +18,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-
-[project.urls]
-Homepage = "https://github.com/gongahkia/why-combinator"
-Repository = "https://github.com/gongahkia/why-combinator"
-Issues = "https://github.com/gongahkia/why-combinator/issues"
-
 dependencies = [
     "typer (>=0.21.1,<0.22.0)",
     "rich (>=14.3.2,<15.0.0)",
@@ -31,6 +25,11 @@ dependencies = [
     "httpx (>=0.28.1,<0.29.0)",
     "python-dotenv (>=1.2.1,<2.0.0)"
 ]
+
+[project.urls]
+Homepage = "https://github.com/gongahkia/why-combinator"
+Repository = "https://github.com/gongahkia/why-combinator"
+Issues = "https://github.com/gongahkia/why-combinator/issues"
 
 [project.optional-dependencies]
 pdf = ["fpdf2>=2.7.0"]
