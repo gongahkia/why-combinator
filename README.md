@@ -3,21 +3,20 @@
 
 # `Why-Combinator`
 
-AI-powered [startup simulation engine](#architecture) using multi-agent systems to model startup ecosystems.
+[Multi-agent](#architecture) startup simulation engine.
 
 ## Stack
 
-* *Core*: [Python 3.11+](https://www.python.org/), [asyncio](https://docs.python.org/3/library/asyncio.html), [Typer](https://typer.tiangolo.com/), [Rich](https://github.com/Textualize/rich), [TinyDB](https://tinydb.readthedocs.io/)
+* *Core*: [Python](https://www.python.org/), [asyncio](https://docs.python.org/3/library/asyncio.html), [Typer](https://typer.tiangolo.com/), [Rich](https://github.com/Textualize/rich), [TinyDB](https://tinydb.readthedocs.io/)
 * *LLM Providers*: [OpenAI](https://platform.openai.com/), [Anthropic](https://www.anthropic.com/), [Ollama](https://ollama.com/), [HuggingFace](https://huggingface.co/)
 * *Networking*: [httpx](https://www.python-httpx.org/)
 * *Config*: [python-dotenv](https://github.com/theskumar/python-dotenv), [TOML templates](https://toml.io/)
-* *Export*: JSON, CSV, Markdown, [PDF (fpdf2)](https://py-pdf.github.io/fpdf2/)
 * *Testing*: [pytest](https://docs.pytest.org/), [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio), [mypy](https://mypy-lang.org/)
 * *CI/CD*: [GitHub Actions](https://github.com/features/actions)
 
 ## What `Why-Combinator` can do *([currently](https://github.com/gongahkia/why-combinator/issues))*
 
-* **Multi-agent simulation**: 11 stakeholder archetypes (customer, investor, competitor, regulator, employee, partner, critic, media, supplier, advisor) with LLM-driven reasoning
+* **Multi-agent simulation**: 11 stakeholder archetypes *(customer, investor, competitor, regulator, employee, partner, critic, media, supplier, advisor)* with LLM-driven reasoning
 * **Startup templates**: Pre-built scenarios for SaaS, fintech, marketplace and hardware startups
 * **Economic modeling**: CAC, LTV, burn rate, runway, churn, retention, market share and revenue models (subscription, transaction, one-time)
 * **Live TUI dashboard**: Real-time Rich-based dashboard with metrics, agent roster, event log and sentiment indicators
@@ -25,7 +24,6 @@ AI-powered [startup simulation engine](#architecture) using multi-agent systems 
 * **Simulation lifecycle**: Multi-phase transitions (idea, MVP, launch, growth, scale, exit) with seasonal multipliers and market saturation
 * **Checkpointing**: Save/resume simulations, reproducible runs via seed, LLM response caching
 * **Analytics**: Compare multiple simulations, custom metric builders, scenario branching
-* **Export**: JSON bundles, CSV tables, Markdown reports, PDF reports, pipe-friendly JSON for CLI integration
 * **Programmatic API**: Python API via `why_combinator.api` with `ProgressCallback` protocol for headless/batch usage
 
 ## Screenshots
