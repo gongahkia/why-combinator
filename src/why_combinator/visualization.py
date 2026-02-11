@@ -6,7 +6,19 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from why_combinator.dashboard import AGENT_AVATARS
+
+AGENT_AVATARS = { # ascii art per stakeholder type
+    "customer": "[bold green]$[/bold green]",
+    "competitor": "[bold red]X[/bold red]",
+    "investor": "[bold yellow]&[/bold yellow]",
+    "regulator": "[bold blue]#[/bold blue]",
+    "employee": "[bold magenta]@[/bold magenta]",
+    "partner": "[bold cyan]+[/bold cyan]",
+    "critic": "[bold white]![/bold white]",
+    "media": "[bold yellow]*[/bold yellow]",
+    "supplier": "[bold green]%[/bold green]",
+    "advisor": "[bold cyan]?[/bold cyan]",
+}
 
 def ascii_relationship_graph(agents: List[Dict[str, Any]], edges: List[Tuple[str, str, Dict[str, Any]]]) -> str:
     """Build ASCII relationship graph showing connections."""

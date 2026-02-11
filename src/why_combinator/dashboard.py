@@ -14,18 +14,7 @@ from rich.live import Live
 from why_combinator.events import Event
 from why_combinator.visualization import ascii_relationship_graph, ascii_sentiment_gauge
 
-AGENT_AVATARS = { # ascii art per stakeholder type
-    "customer": "[bold green]$[/bold green]",
-    "competitor": "[bold red]X[/bold red]",
-    "investor": "[bold yellow]&[/bold yellow]",
-    "regulator": "[bold blue]#[/bold blue]",
-    "employee": "[bold magenta]@[/bold magenta]",
-    "partner": "[bold cyan]+[/bold cyan]",
-    "critic": "[bold white]![/bold white]",
-    "media": "[bold yellow]*[/bold yellow]",
-    "supplier": "[bold green]%[/bold green]",
-    "advisor": "[bold cyan]?[/bold cyan]",
-}
+
 ACTION_COLORS = {
     "buy": "green", "sell": "red", "invest": "yellow", "complain": "red",
     "post_review": "cyan", "partner": "blue", "ignore": "dim", "wait": "dim",
