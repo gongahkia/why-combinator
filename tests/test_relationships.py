@@ -16,7 +16,7 @@ def test_relationship_decay():
         graph.tick(decay_factor=0.99)
     final_strength = graph.get_relationship("A", "B")["strength"]
     assert final_strength < initial_strength
-    assert final["strength"] > 0.0 # Should not be zero yet
+    assert final_strength > 0.0
 
 def test_coalition_detection_mutual():
     """Test detection of coalition with mutual relationships."""
