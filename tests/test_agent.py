@@ -1,41 +1,40 @@
 """Tests for GenericAgent: perceive/reason/act with MockProvider."""
+import pytest
 from why_combinator.agent.impl import GenericAgent
-from why_combinator.models import AgentEntity, StakeholderType
+from why_combinator.models import AgentEntity, StakeholderType, WorldState
 
 
-def test_agent_perceive_reason_act(sample_agents, event_bus, mock_llm):
+def _make_world_state(agents=None):
+    return WorldState(id="sim1", tick=1, date="2025-01-01", timestamp=1000.0, stage="mvp", metrics={}, agents=agents or [], sentiments={}, relationships={})
+
+
+async def test_agent_perceive_reason_act(sample_agents, event_bus, mock_llm):
     entity = sample_agents[0]
     world_context = {"id": "sim1", "name": "Test", "description": "test", "industry": "SaaS", "stage": "mvp"}
     agent = GenericAgent(entity, event_bus, mock_llm, world_context)
-
-    world_state = {"date": "2025-01-01", "timestamp": 1000.0, "agents": [{"id": entity.id, "name": entity.name, "role": entity.role, "type": entity.type.value}]}
-    interaction = agent.run_step(world_state, 1000.0)
-
+    ws = _make_world_state([{"id": entity.id, "name": entity.name, "role": entity.role, "type": entity.type.value}])
+    interaction = await agent.run_step(ws, 1000.0)
     assert interaction is not None
     assert interaction.agent_id == entity.id
     assert interaction.action != ""
 
 
-def test_agent_produces_interaction_log(sample_agents, event_bus, mock_llm):
-    entity = sample_agents[1]  # investor
+async def test_agent_produces_interaction_log(sample_agents, event_bus, mock_llm):
+    entity = sample_agents[1]
     world_context = {"id": "sim1", "name": "Test", "description": "test", "industry": "SaaS", "stage": "mvp"}
     agent = GenericAgent(entity, event_bus, mock_llm, world_context)
-
-    world_state = {"date": "2025-01-01", "timestamp": 1000.0, "agents": []}
-    interaction = agent.run_step(world_state, 1000.0)
-
+    ws = _make_world_state()
+    interaction = await agent.run_step(ws, 1000.0)
     assert interaction is not None
     assert interaction.simulation_id == "sim1"
 
 
-def test_agent_memory_updated(sample_agents, event_bus, mock_llm):
+async def test_agent_memory_updated(sample_agents, event_bus, mock_llm):
     entity = sample_agents[0]
     world_context = {"id": "sim1", "name": "Test", "description": "test", "industry": "SaaS", "stage": "mvp"}
     agent = GenericAgent(entity, event_bus, mock_llm, world_context)
-
-    world_state = {"date": "2025-01-01", "timestamp": 1000.0, "agents": []}
-    agent.run_step(world_state, 1000.0)
-
+    ws = _make_world_state()
+    await agent.run_step(ws, 1000.0)
     assert len(agent.memory) > 0
 
 def test_agent_memory_eviction(sample_agents, event_bus, mock_llm):

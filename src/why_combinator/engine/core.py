@@ -373,25 +373,27 @@ class SimulationEngine:
             self.progress_callback.on_complete(summary)
         
         return summary
+    async def _run_loop_step(self) -> None:
+        """Single step for run_loop with a fresh semaphore per asyncio.run call."""
+        self._semaphore = asyncio.Semaphore(self._max_concurrent)
+        await self.step()
     def run_loop(self, max_ticks: Optional[int] = None, max_seconds: Optional[float] = None) -> None:
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
         self.start()
+        self._semaphore = asyncio.Semaphore(self._max_concurrent) # rebind to fresh loop
         start_wall_time = time.time()
         try:
             while self.is_running:
                 if self.is_paused:
-                    time.sleep(0.1) # spin-wait while paused
+                    time.sleep(0.1)
                     continue
-                    
-                # Check wall clock timeout
                 if max_seconds and (time.time() - start_wall_time) > max_seconds:
                     logger.warning(f"Simulation {self.simulation.id} exceeded max wall seconds ({max_seconds:.2f}s), stopping gracefully.")
                     self.stop()
                     break
-
                 start_real = time.time()
-                asyncio.run(self.step())
+                asyncio.run(self._run_loop_step())
                 
                 if max_ticks and self.tick_count >= max_ticks:
                     self.stop()

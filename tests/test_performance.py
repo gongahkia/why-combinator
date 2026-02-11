@@ -33,11 +33,11 @@ def test_agent_pool_rotation():
     """Test AgentPool rotates agents correctly when pool size exceeds active limit."""
     pool = AgentPool(max_active=2)
     
-    a1 = MagicMock(spec=BaseAgent)
+    a1 = MagicMock()
     a1.entity.id = "1"
-    a2 = MagicMock(spec=BaseAgent)
+    a2 = MagicMock()
     a2.entity.id = "2"
-    a3 = MagicMock(spec=BaseAgent)
+    a3 = MagicMock()
     a3.entity.id = "3"
     
     # Add agents

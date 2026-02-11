@@ -81,6 +81,7 @@ def calculate_statistics(values: List[float]) -> Dict[str, float]:
     values.sort()
     
     stats = {
+        "count": n,
         "mean": statistics.mean(values),
         "min": values[0],
         "max": values[-1],

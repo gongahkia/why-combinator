@@ -10,16 +10,12 @@ def test_relationship_decay():
     for _ in range(5):
         graph.add_or_update("A", "B", RelationType.ALLIANCE, strength_delta=0.1)
     
-    initial = graph.get_relationship("A", "B")
-    assert initial["strength"] >= 0.5
-    
-    # Tick 100 times with decay 0.99
-    # 0.5 * (0.99)^100 approx 0.18
+    initial_strength = graph.get_relationship("A", "B")["strength"]
+    assert initial_strength >= 0.5
     for _ in range(100):
         graph.tick(decay_factor=0.99)
-        
-    final = graph.get_relationship("A", "B")
-    assert final["strength"] < initial["strength"]
+    final_strength = graph.get_relationship("A", "B")["strength"]
+    assert final_strength < initial_strength
     assert final["strength"] > 0.0 # Should not be zero yet
 
 def test_coalition_detection_mutual():

@@ -42,8 +42,7 @@ def test_ollama_retry_on_429(mock_client_cls):
         MockResponse(200, {"response": "Success!"}) # Succeed
     ]
 
-    # Use small delay for test speed
-    retry_policy = RetryPolicy(initial_delay=0.01, max_retries=3)
+    retry_policy = RetryPolicy(max_retries=3, backoff_base=0.01)
     provider = OllamaProvider(retry_policy=retry_policy)
 
     # Execute
@@ -68,33 +67,19 @@ def test_openai_exponential_backoff(mock_sleep, mock_client_cls):
         MockResponse(200, {"choices": [{"message": {"content": "Success"}}]})
     ]
     
-    retry_policy = RetryPolicy(initial_delay=1.0, max_retries=4, backoff_factor=2.0)
+    retry_policy = RetryPolicy(max_retries=4, backoff_base=2.0)
     provider = OpenAIProvider(api_key="sk-test", retry_policy=retry_policy)
-    
     provider.completion("test")
-    
-    # Expected delays: 1.0, 2.0, 4.0
-    assert mock_sleep.call_count == 3
+    assert mock_sleep.call_count == 3 # backoff_base ** attempt: 2^0=1.0, 2^1=2.0, 2^2=4.0
     mock_sleep.assert_any_call(1.0)
     mock_sleep.assert_any_call(2.0)
     mock_sleep.assert_any_call(4.0)
 
 def test_anthropic_missing_api_key():
-    """Test that AnthropicProvider raises ConfigError widely."""
-    # We need to ensure global config doesn't have it set, or we simulate it.
-    # LLMFactory checks env var before creating.
-    # But if we instantiate directly:
-    # provider = AnthropicProvider(api_key=None) # This might work if logic is in init?
-    # Let's check AnthropicProvider.__init__
-    pass # Checked, it doesn't enforce in __init__ currently, LLMFactory enforces it. 
-         # But the task says "AnthropicProvider handles missing API key". 
-         # I modified LLMFactory to handle it.
-         # So I should test LLMFactory creation failure for Anthropic.
-    
-    # Mock the module-level constant in factory
+    """Test that _create_instance raises ConfigError for missing Anthropic key."""
     with patch("why_combinator.llm.factory.ANTHROPIC_API_KEY", None):
         with pytest.raises(ConfigError, match="Missing API key for Anthropic"):
-            LLMFactory.create("anthropic:claude-3")
+            LLMFactory._create_instance("anthropic:claude-3")
 
 def test_cached_llm_determinism(tmp_path):
     """Test CachedLLMProvider returns identical response."""
