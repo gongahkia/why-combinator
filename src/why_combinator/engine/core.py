@@ -381,7 +381,6 @@ class SimulationEngine:
         """Blocking run loop for CLI usage."""
         self._install_signal_handlers()
         self.start()
-        self._semaphore = asyncio.Semaphore(self._max_concurrent) # rebind to fresh loop
         start_wall_time = time.time()
         try:
             while self.is_running:
