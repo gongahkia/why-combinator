@@ -3,7 +3,7 @@
 
 # `Why-Combinator`
 
-[Multi-agent](#architecture) startup simulation engine.
+[CLI](https://aws.amazon.com/what-is/cli/)-first [multi-agent](#architecture) startup simulation engine.
 
 ## Stack
 
@@ -18,7 +18,7 @@
 
 * **Multi-agent simulation**: 11 stakeholder archetypes *(customer, investor, competitor, regulator, employee, partner, critic, media, supplier, advisor)* with LLM-driven reasoning
 * **Startup templates**: Pre-built scenarios for SaaS, fintech, marketplace and hardware startups
-a* **Economic modeling**: CAC, LTV, burn rate, runway, churn, retention, market share and revenue models *(subscription, transaction, one-time)*
+* **Economic modeling**: CAC, LTV, burn rate, runway, churn, retention, market share and revenue models *(subscription, transaction, one-time)*
 * **Live TUI dashboard**: Real-time Rich-based dashboard with metrics, agent roster, event log and sentiment indicators
 * **Agent relationships**: Relationship graphs, coalition detection, sentiment tracking, emergence detection and debate sessions
 * **Simulation lifecycle**: Multi-phase transitions *(idea, MVP, launch, growth, scale, exit)* with seasonal multipliers and market saturation
