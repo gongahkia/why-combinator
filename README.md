@@ -114,3 +114,7 @@ $ pytest tests/
 ## Reference
 
 The name `Why-Combinator` is in reference to the startup accelerator [Y Combinator](https://www.ycombinator.com/). 
+
+<div align="center">
+    <img src="./asset/logo/Y.png" width="50%">
+</div>
