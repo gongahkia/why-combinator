@@ -1,5 +1,0 @@
-gongahkia preprocessing services
-remove air con ledge
-remove the place where you hang your laundry
-remove all the funny door arcs
-remove any other non-house stuff (random diagram arrows)
