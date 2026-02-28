@@ -26,6 +26,18 @@ def _average(scores: list[float]) -> float:
     return sum(scores) / len(scores) if scores else 0.0
 
 
+def _extract_confidence(raw_response: dict[str, object]) -> float:
+    parsed = raw_response.get("parsed")
+    if isinstance(parsed, dict):
+        confidence = parsed.get("confidence")
+        if isinstance(confidence, (int, float)):
+            return max(0.0, min(1.0, float(confidence)))
+    confidence = raw_response.get("confidence")
+    if isinstance(confidence, (int, float)):
+        return max(0.0, min(1.0, float(confidence)))
+    return 1.0
+
+
 def _weighted(scores: list[tuple[uuid.UUID, float]], weights: dict[uuid.UUID, float]) -> float:
     weighted_sum = 0.0
     total_weight = 0.0
@@ -64,11 +76,22 @@ async def aggregate_submission_judge_scores(
         )
 
     if mode == "average":
-        quality_score = _average([row.score for row in rows])
+        confidence_weighted_scores = [
+            (row.score, _extract_confidence(row.raw_response if isinstance(row.raw_response, dict) else {}))
+            for row in rows
+        ]
+        numerator = sum(score * confidence for score, confidence in confidence_weighted_scores)
+        denominator = sum(confidence for _, confidence in confidence_weighted_scores) or len(rows) or 1.0
+        quality_score = numerator / denominator
     elif mode == "weighted_panel":
+        confidence_adjusted_weights = {
+            row.judge_profile_id: (judge_weights or {}).get(row.judge_profile_id, 1.0)
+            * _extract_confidence(row.raw_response if isinstance(row.raw_response, dict) else {})
+            for row in rows
+        }
         quality_score = _weighted(
             scores=[(row.judge_profile_id, row.score) for row in rows],
-            weights=judge_weights or {},
+            weights=confidence_adjusted_weights,
         )
     elif mode == "head_judge_override":
         head_judge_row = next((row for row in rows if row.judge_profile.head_judge), None)

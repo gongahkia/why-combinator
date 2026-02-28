@@ -16,6 +16,18 @@ class JudgeRubricOutput:
     rubric_weight: float = 1.0
 
 
+def _extract_judge_confidence(raw_response: dict[str, object]) -> float:
+    parsed = raw_response.get("parsed")
+    if isinstance(parsed, dict):
+        confidence = parsed.get("confidence")
+        if isinstance(confidence, (int, float)):
+            return max(0.0, min(1.0, float(confidence)))
+    confidence = raw_response.get("confidence")
+    if isinstance(confidence, (int, float)):
+        return max(0.0, min(1.0, float(confidence)))
+    return 1.0
+
+
 def normalize_score(raw_score: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
     if maximum <= minimum:
         raise ValueError("maximum must be greater than minimum")
@@ -45,7 +57,11 @@ async def score_submission_quality(
     rows = (await session.execute(stmt)).scalars().all()
     return score_quality_rubric(
         outputs=[
-            JudgeRubricOutput(judge_profile_id=row.judge_profile_id, score=row.score, rubric_weight=1.0)
+            JudgeRubricOutput(
+                judge_profile_id=row.judge_profile_id,
+                score=row.score,
+                rubric_weight=_extract_judge_confidence(row.raw_response if isinstance(row.raw_response, dict) else {}),
+            )
             for row in rows
         ]
     )
