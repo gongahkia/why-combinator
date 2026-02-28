@@ -4,11 +4,11 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, delete, select
+from sqlalchemy import Select, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import SubmissionState
-from app.db.models import LeaderboardEntry, ScoreEvent, Submission
+from app.db.models import LeaderboardEntry, PenaltyEvent, ScoreEvent, Submission
 
 
 @dataclass(frozen=True)
@@ -16,6 +16,7 @@ class RankedSubmission:
     submission_id: uuid.UUID
     final_score: float
     accepted_at: datetime | None
+    total_penalty: float
     tie_break_metadata: dict[str, object]
 
 
@@ -25,6 +26,14 @@ async def _latest_final_score(session: AsyncSession, submission_id: uuid.UUID) -
     )
     row = (await session.execute(stmt)).scalar_one_or_none()
     return None if row is None else row.final_score
+
+
+async def _total_penalty(session: AsyncSession, submission_id: uuid.UUID) -> float:
+    stmt: Select[tuple[float]] = select(func.coalesce(func.sum(PenaltyEvent.value), 0.0)).where(
+        PenaltyEvent.submission_id == submission_id
+    )
+    total = (await session.execute(stmt)).scalar_one()
+    return round(float(total), 6)
 
 
 async def materialize_leaderboard(session: AsyncSession, run_id: uuid.UUID) -> list[LeaderboardEntry]:
@@ -41,8 +50,10 @@ async def materialize_leaderboard(session: AsyncSession, run_id: uuid.UUID) -> l
         score = await _latest_final_score(session, submission.id)
         if score is None:
             continue
+        total_penalty = await _total_penalty(session, submission.id)
         tie_break_metadata = {
             "accepted_at": submission.accepted_at.isoformat() if submission.accepted_at else None,
+            "total_penalty": total_penalty,
             "submission_id": str(submission.id),
         }
         ranked_candidates.append(
@@ -50,6 +61,7 @@ async def materialize_leaderboard(session: AsyncSession, run_id: uuid.UUID) -> l
                 submission_id=submission.id,
                 final_score=score,
                 accepted_at=submission.accepted_at,
+                total_penalty=total_penalty,
                 tie_break_metadata=tie_break_metadata,
             )
         )
@@ -61,6 +73,7 @@ async def materialize_leaderboard(session: AsyncSession, run_id: uuid.UUID) -> l
         key=lambda value: (
             -value.final_score,
             _accepted_sort_key(value),
+            value.total_penalty,
             str(value.submission_id),
         )
     )
