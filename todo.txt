@@ -1,4 +1,3 @@
-(A) Implement transactional submission ingestion that atomically writes submission, artifacts, and initial status +db +submissions
 (A) Implement score event append-only table writes with immutable payload checksum +db +scoring
 (A) Implement penalty event append-only table writes with source explanation and checkpoint id +db +penalties
 (A) Implement checkpoint snapshot table to record active weights and policies at each scoring interval +db +scoring
