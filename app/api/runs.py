@@ -61,7 +61,7 @@ async def start_run(
     if challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
 
-    await seed_default_judge_panel_if_incomplete(session, challenge_id)
+    await seed_default_judge_panel_if_incomplete(session, challenge_id, challenge.prompt)
     try:
         await validate_domain_expert_judge_present(session, challenge_id)
     except RunStartValidationError as exc:

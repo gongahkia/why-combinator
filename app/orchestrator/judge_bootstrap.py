@@ -14,9 +14,30 @@ DEFAULT_JUDGE_PANEL: list[tuple[str, str, str]] = [
 ]
 
 
+REGULATED_KEYWORDS = {
+    "hipaa",
+    "healthcare",
+    "medical",
+    "gdpr",
+    "pci",
+    "sox",
+    "banking",
+    "finance",
+    "fintech",
+    "legal",
+    "compliance",
+}
+
+
+def _needs_compliance_judge(prompt: str) -> bool:
+    lowered = prompt.lower()
+    return any(keyword in lowered for keyword in REGULATED_KEYWORDS)
+
+
 async def seed_default_judge_panel_if_incomplete(
     session: AsyncSession,
     challenge_id: uuid.UUID,
+    challenge_prompt: str,
 ) -> list[JudgeProfile]:
     stmt: Select[tuple[JudgeProfile]] = select(JudgeProfile).where(JudgeProfile.challenge_id == challenge_id)
     existing = (await session.execute(stmt)).scalars().all()
@@ -37,5 +58,18 @@ async def seed_default_judge_panel_if_incomplete(
         session.add(row)
         created.append(row)
     if created:
+        await session.flush()
+
+    if "compliance" not in existing_domains and _needs_compliance_judge(challenge_prompt):
+        compliance_row = JudgeProfile(
+            challenge_id=challenge_id,
+            domain="compliance",
+            scoring_style="strict",
+            profile_prompt="Compliance judge focused on regulatory and safety requirements.",
+            head_judge=False,
+            source_type="auto_suggestion",
+        )
+        session.add(compliance_row)
+        created.append(compliance_row)
         await session.flush()
     return created
