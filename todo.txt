@@ -1,4 +1,3 @@
-(A) Implement API endpoint to register judge profiles from CSV payload mapped to canonical schema +api +judging
 (A) Implement API endpoint to register judge profile from URL by fetching via curl subprocess with timeout and size limit +api +ingest
 (A) Implement URL ingestion sanitizer that only allows http/https schemes and blocks localhost/private CIDR targets +security +ingest
 (A) Implement parser pipeline to auto-detect fetched profile content type and normalize to judge profile schema +ingest +judging

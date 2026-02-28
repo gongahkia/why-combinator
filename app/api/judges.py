@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from datetime import datetime
 
@@ -45,6 +47,25 @@ def normalize_profiles(payload: object) -> list[JudgeProfileInput]:
     if not isinstance(profiles, list):
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="profiles must be a list")
     return [JudgeProfileInput.model_validate(item) for item in profiles]
+
+
+def parse_csv_profiles(payload: str) -> list[JudgeProfileInput]:
+    reader = csv.DictReader(io.StringIO(payload))
+    if reader.fieldnames is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="csv header is required")
+
+    normalized: list[dict[str, object]] = []
+    for row in reader:
+        head_judge = str(row.get("head_judge", "")).strip().lower()
+        normalized.append(
+            {
+                "domain": (row.get("domain") or "").strip(),
+                "scoring_style": (row.get("scoring_style") or "").strip(),
+                "profile_prompt": (row.get("profile_prompt") or "").strip(),
+                "head_judge": head_judge in {"1", "true", "yes", "y"},
+            }
+        )
+    return normalize_profiles(normalized)
 
 
 async def persist_profiles(
@@ -119,3 +140,17 @@ async def register_judge_profiles_yaml(
 
     profiles = normalize_profiles(parsed)
     return await persist_profiles(challenge_id, profiles, "yaml", session)
+
+
+@router.post(
+    "/{challenge_id}/judge-profiles/csv",
+    status_code=status.HTTP_201_CREATED,
+    response_model=list[JudgeProfileResponse],
+)
+async def register_judge_profiles_csv(
+    challenge_id: uuid.UUID,
+    payload: str = Body(..., media_type="text/csv"),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[JudgeProfileResponse]:
+    profiles = parse_csv_profiles(payload)
+    return await persist_profiles(challenge_id, profiles, "csv", session)
