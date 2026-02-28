@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.enums import SubmissionState
-from app.db.models import Submission
+from app.db.models import Run, Submission
 
 
 async def apply_quality_threshold_gate(
@@ -18,7 +18,7 @@ async def apply_quality_threshold_gate(
 ) -> bool:
     stmt: Select[tuple[Submission]] = (
         select(Submission)
-        .options(selectinload(Submission.run).selectinload(Submission.run.challenge))
+        .options(selectinload(Submission.run).selectinload(Run.challenge))
         .where(Submission.id == submission_id)
     )
     submission = (await session.execute(stmt)).scalar_one_or_none()

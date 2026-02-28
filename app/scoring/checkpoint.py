@@ -62,8 +62,9 @@ async def run_checkpoint_scoring_worker(
     session: AsyncSession,
     run_id: uuid.UUID,
     trace_id: str | None = None,
+    score_time: datetime | None = None,
 ) -> CheckpointScoringResult:
-    now = datetime.now(UTC)
+    now = score_time or datetime.now(UTC)
     checkpoint_id = _checkpoint_id(now)
 
     run = await session.get(Run, run_id)

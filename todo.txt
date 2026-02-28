@@ -1,4 +1,3 @@
-(A) Add integration test for forward-only scoring updates proving no retroactive rescore before next checkpoint +tests +scoring
 (A) Add integration test for similarity and too-safe penalty composition against controlled baseline ideas +tests +scoring
 (A) Add integration test for non-production penalty assignment when agent submits no valid MVP +tests +penalties
 (A) Add integration test for mandatory artifact/readme/value-hypothesis validator rejecting incomplete submissions +tests +validation

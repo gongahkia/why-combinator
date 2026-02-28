@@ -13,7 +13,7 @@ from app.integrations.codex_client import (
     CodexClientError,
     CodexRequest,
 )
-from app.db.models import JudgeScore, Run
+from app.db.models import Challenge, JudgeScore, Run
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ async def run_judge_scoring_worker(
 ) -> int:
     run_stmt: Select[tuple[Run]] = (
         select(Run)
-        .options(selectinload(Run.challenge).selectinload(Run.challenge.judge_profiles), selectinload(Run.submissions))
+        .options(selectinload(Run.challenge).selectinload(Challenge.judge_profiles), selectinload(Run.submissions))
         .where(Run.id == run_id)
     )
     run = (await session.execute(run_stmt)).scalar_one_or_none()
