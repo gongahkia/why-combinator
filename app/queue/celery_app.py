@@ -24,5 +24,6 @@ celery_app.conf.update(
         "app.queue.jobs.hacker_run": {"queue": "hacker-run"},
         "app.queue.jobs.judge_run": {"queue": "judge-run"},
         "app.queue.jobs.checkpoint_score": {"queue": "checkpoint-score"},
+        "app.queue.jobs.complete_run": {"queue": "run-complete"},
     },
 )

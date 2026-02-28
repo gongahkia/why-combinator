@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from celery import shared_task
 
-from app.orchestrator.jobs import run_checkpoint_score_job, run_hacker_job, run_judge_job
+from app.orchestrator.jobs import run_checkpoint_score_job, run_complete_run_job, run_hacker_job, run_judge_job
 from app.queue.budget import create_redis_client, reserve_budget, task_cost_from_env
 
 
@@ -50,3 +50,14 @@ def checkpoint_score(self, run_id: str) -> dict[str, str]:
     if not accepted:
         return payload
     return run_checkpoint_score_job(run_id)
+
+
+@shared_task(
+    name="app.queue.jobs.complete_run",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def complete_run(self, run_id: str) -> dict[str, str]:
+    return run_complete_run_job(run_id)
