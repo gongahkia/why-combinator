@@ -103,6 +103,7 @@ class Submission(TimestampMixin, Base):
     artifacts: Mapped[list[Artifact]] = relationship(back_populates="submission", cascade="all, delete-orphan")
     score_events: Mapped[list[ScoreEvent]] = relationship(back_populates="submission", cascade="all, delete-orphan")
     penalty_events: Mapped[list[PenaltyEvent]] = relationship(back_populates="submission", cascade="all, delete-orphan")
+    judge_scores: Mapped[list[JudgeScore]] = relationship(back_populates="submission", cascade="all, delete-orphan")
 
 
 class Artifact(TimestampMixin, Base):
@@ -171,3 +172,23 @@ class JudgeProfile(TimestampMixin, Base):
     source_type: Mapped[str] = mapped_column(String(32), nullable=False, default="inline_json")
 
     challenge: Mapped[Challenge] = relationship(back_populates="judge_profiles")
+    judge_scores: Mapped[list[JudgeScore]] = relationship(back_populates="judge_profile", cascade="all, delete-orphan")
+
+
+class JudgeScore(TimestampMixin, Base):
+    __tablename__ = "judge_scores"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    judge_profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("judge_profiles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    checkpoint_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_response: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+
+    submission: Mapped[Submission] = relationship(back_populates="judge_scores")
+    judge_profile: Mapped[JudgeProfile] = relationship(back_populates="judge_scores")
