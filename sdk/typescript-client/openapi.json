@@ -1,0 +1,3352 @@
+{
+  "components": {
+    "schemas": {
+      "APIErrorModel": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "APIErrorModel",
+        "type": "object"
+      },
+      "AgentProductivityMetrics": {
+        "properties": {
+          "accepted_mvps": {
+            "title": "Accepted Mvps",
+            "type": "integer"
+          },
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "agent_name": {
+            "title": "Agent Name",
+            "type": "string"
+          },
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "penalties": {
+            "title": "Penalties",
+            "type": "integer"
+          },
+          "penalty_total": {
+            "title": "Penalty Total",
+            "type": "number"
+          }
+        },
+        "required": [
+          "agent_id",
+          "agent_name",
+          "attempts",
+          "accepted_mvps",
+          "penalties",
+          "penalty_total"
+        ],
+        "title": "AgentProductivityMetrics",
+        "type": "object"
+      },
+      "AgentProductivityResponse": {
+        "properties": {
+          "metrics": {
+            "items": {
+              "$ref": "#/components/schemas/AgentProductivityMetrics"
+            },
+            "title": "Metrics",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "metrics"
+        ],
+        "title": "AgentProductivityResponse",
+        "type": "object"
+      },
+      "ArtifactDownloadMetadataResponse": {
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_type": {
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "storage_key": {
+            "title": "Storage Key",
+            "type": "string"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "submission_id",
+          "artifact_type",
+          "storage_key",
+          "content_hash",
+          "download_url"
+        ],
+        "title": "ArtifactDownloadMetadataResponse",
+        "type": "object"
+      },
+      "ArtifactIngestInput": {
+        "properties": {
+          "artifact_type": {
+            "$ref": "#/components/schemas/ArtifactType"
+          },
+          "content_base64": {
+            "minLength": 8,
+            "title": "Content Base64",
+            "type": "string"
+          },
+          "filename": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Filename",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_type",
+          "filename",
+          "content_base64"
+        ],
+        "title": "ArtifactIngestInput",
+        "type": "object"
+      },
+      "ArtifactType": {
+        "enum": [
+          "web_bundle",
+          "cli_package",
+          "api_service",
+          "notebook"
+        ],
+        "title": "ArtifactType",
+        "type": "string"
+      },
+      "ArtifactUploadResponse": {
+        "properties": {
+          "artifact_type": {
+            "$ref": "#/components/schemas/ArtifactType"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "storage_key": {
+            "title": "Storage Key",
+            "type": "string"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "submission_id",
+          "artifact_type",
+          "storage_key",
+          "content_hash",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ArtifactUploadResponse",
+        "type": "object"
+      },
+      "Body_upload_artifact_submissions__submission_id__artifacts_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_artifact_submissions__submission_id__artifacts_post",
+        "type": "object"
+      },
+      "ChallengeCreateRequest": {
+        "properties": {
+          "complexity_slider": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Complexity Slider",
+            "type": "number"
+          },
+          "iteration_window_seconds": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 86400.0,
+            "title": "Iteration Window Seconds",
+            "type": "integer"
+          },
+          "minimum_quality_threshold": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Minimum Quality Threshold",
+            "type": "number"
+          },
+          "prompt": {
+            "minLength": 10,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "risk_appetite": {
+            "enum": [
+              "conservative",
+              "balanced",
+              "aggressive"
+            ],
+            "title": "Risk Appetite",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 255,
+            "minLength": 3,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "prompt",
+          "iteration_window_seconds",
+          "minimum_quality_threshold",
+          "risk_appetite",
+          "complexity_slider"
+        ],
+        "title": "ChallengeCreateRequest",
+        "type": "object"
+      },
+      "ChallengeResponse": {
+        "properties": {
+          "complexity_slider": {
+            "title": "Complexity Slider",
+            "type": "number"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "iteration_window_seconds": {
+            "title": "Iteration Window Seconds",
+            "type": "integer"
+          },
+          "minimum_quality_threshold": {
+            "title": "Minimum Quality Threshold",
+            "type": "number"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "risk_appetite": {
+            "title": "Risk Appetite",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "prompt",
+          "iteration_window_seconds",
+          "minimum_quality_threshold",
+          "risk_appetite",
+          "complexity_slider",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ChallengeResponse",
+        "type": "object"
+      },
+      "ChallengeUpdateRequest": {
+        "properties": {
+          "complexity_slider": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Complexity Slider"
+          },
+          "iteration_window_seconds": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 86400.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iteration Window Seconds"
+          },
+          "minimum_quality_threshold": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Quality Threshold"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "minLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt"
+          },
+          "risk_appetite": {
+            "anyOf": [
+              {
+                "enum": [
+                  "conservative",
+                  "balanced",
+                  "aggressive"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Appetite"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 3,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "ChallengeUpdateRequest",
+        "type": "object"
+      },
+      "CheckpointVarianceMetrics": {
+        "properties": {
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "inter_judge_variance": {
+            "title": "Inter Judge Variance",
+            "type": "number"
+          },
+          "scored_items": {
+            "title": "Scored Items",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "checkpoint_id",
+          "scored_items",
+          "inter_judge_variance"
+        ],
+        "title": "CheckpointVarianceMetrics",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "JudgeDisagreementMetrics": {
+        "properties": {
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "judge_profile_id": {
+            "format": "uuid",
+            "title": "Judge Profile Id",
+            "type": "string"
+          },
+          "max_absolute_disagreement": {
+            "title": "Max Absolute Disagreement",
+            "type": "number"
+          },
+          "mean_absolute_disagreement": {
+            "title": "Mean Absolute Disagreement",
+            "type": "number"
+          },
+          "scored_items": {
+            "title": "Scored Items",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "judge_profile_id",
+          "domain",
+          "scored_items",
+          "mean_absolute_disagreement",
+          "max_absolute_disagreement"
+        ],
+        "title": "JudgeDisagreementMetrics",
+        "type": "object"
+      },
+      "JudgeDisagreementResponse": {
+        "properties": {
+          "checkpoint_variance": {
+            "items": {
+              "$ref": "#/components/schemas/CheckpointVarianceMetrics"
+            },
+            "title": "Checkpoint Variance",
+            "type": "array"
+          },
+          "judge_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/JudgeDisagreementMetrics"
+            },
+            "title": "Judge Metrics",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "judge_metrics",
+          "checkpoint_variance"
+        ],
+        "title": "JudgeDisagreementResponse",
+        "type": "object"
+      },
+      "JudgeProfileInput": {
+        "properties": {
+          "domain": {
+            "maxLength": 255,
+            "minLength": 2,
+            "title": "Domain",
+            "type": "string"
+          },
+          "head_judge": {
+            "default": false,
+            "title": "Head Judge",
+            "type": "boolean"
+          },
+          "profile_prompt": {
+            "minLength": 8,
+            "title": "Profile Prompt",
+            "type": "string"
+          },
+          "scoring_style": {
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "Scoring Style",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain",
+          "scoring_style",
+          "profile_prompt"
+        ],
+        "title": "JudgeProfileInput",
+        "type": "object"
+      },
+      "JudgeProfileRegisterJSONRequest": {
+        "properties": {
+          "profiles": {
+            "items": {
+              "$ref": "#/components/schemas/JudgeProfileInput"
+            },
+            "minItems": 1,
+            "title": "Profiles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "profiles"
+        ],
+        "title": "JudgeProfileRegisterJSONRequest",
+        "type": "object"
+      },
+      "JudgeProfileResponse": {
+        "properties": {
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "domain": {
+            "title": "Domain",
+            "type": "string"
+          },
+          "head_judge": {
+            "title": "Head Judge",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "profile_prompt": {
+            "title": "Profile Prompt",
+            "type": "string"
+          },
+          "scoring_style": {
+            "title": "Scoring Style",
+            "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "challenge_id",
+          "domain",
+          "scoring_style",
+          "profile_prompt",
+          "head_judge",
+          "source_type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "JudgeProfileResponse",
+        "type": "object"
+      },
+      "JudgeProfileURLRequest": {
+        "properties": {
+          "max_bytes": {
+            "default": 1048576,
+            "maximum": 5242880.0,
+            "minimum": 1024.0,
+            "title": "Max Bytes",
+            "type": "integer"
+          },
+          "timeout_seconds": {
+            "default": 10,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Timeout Seconds",
+            "type": "integer"
+          },
+          "url": {
+            "minLength": 8,
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "JudgeProfileURLRequest",
+        "type": "object"
+      },
+      "LeaderboardItemResponse": {
+        "properties": {
+          "active_penalties": {
+            "items": {
+              "$ref": "#/components/schemas/PenaltySnippet"
+            },
+            "title": "Active Penalties",
+            "type": "array"
+          },
+          "final_score": {
+            "title": "Final Score",
+            "type": "number"
+          },
+          "judge_rationale_snippets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Judge Rationale Snippets",
+            "type": "array"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "score_breakdown": {
+            "additionalProperties": true,
+            "title": "Score Breakdown",
+            "type": "object"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          },
+          "tie_break_metadata": {
+            "additionalProperties": true,
+            "title": "Tie Break Metadata",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rank",
+          "submission_id",
+          "final_score",
+          "score_breakdown",
+          "active_penalties",
+          "judge_rationale_snippets",
+          "tie_break_metadata"
+        ],
+        "title": "LeaderboardItemResponse",
+        "type": "object"
+      },
+      "LeaderboardResponse": {
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "generated_at",
+          "items"
+        ],
+        "title": "LeaderboardResponse",
+        "type": "object"
+      },
+      "MVPArtifactDownload": {
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "artifact_type": {
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "storage_key": {
+            "title": "Storage Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_id",
+          "artifact_type",
+          "storage_key",
+          "content_hash",
+          "download_url"
+        ],
+        "title": "MVPArtifactDownload",
+        "type": "object"
+      },
+      "MVPBundleItem": {
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/MVPArtifactDownload"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submission_id",
+          "agent_id",
+          "accepted_at",
+          "artifacts"
+        ],
+        "title": "MVPBundleItem",
+        "type": "object"
+      },
+      "MVPBundlesResponse": {
+        "properties": {
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/MVPBundleItem"
+            },
+            "title": "Bundles",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "bundles"
+        ],
+        "title": "MVPBundlesResponse",
+        "type": "object"
+      },
+      "PaginatedLeaderboardResponse": {
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "has_more": {
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardItemResponse"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "generated_at",
+          "items",
+          "next_cursor",
+          "has_more"
+        ],
+        "title": "PaginatedLeaderboardResponse",
+        "type": "object"
+      },
+      "PenaltySnippet": {
+        "properties": {
+          "explanation": {
+            "title": "Explanation",
+            "type": "string"
+          },
+          "penalty_type": {
+            "title": "Penalty Type",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "penalty_type",
+          "value",
+          "explanation"
+        ],
+        "title": "PenaltySnippet",
+        "type": "object"
+      },
+      "ReplayDiffResponse": {
+        "properties": {
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "submissions": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayDiffSubmissionMetrics"
+            },
+            "title": "Submissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "checkpoint_id",
+          "submissions"
+        ],
+        "title": "ReplayDiffResponse",
+        "type": "object"
+      },
+      "ReplayDiffSubmissionMetrics": {
+        "properties": {
+          "absolute_delta": {
+            "title": "Absolute Delta",
+            "type": "number"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "number"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "original_final_score": {
+            "title": "Original Final Score",
+            "type": "number"
+          },
+          "original_rank": {
+            "title": "Original Rank",
+            "type": "integer"
+          },
+          "rank_shift": {
+            "title": "Rank Shift",
+            "type": "integer"
+          },
+          "replay_final_score": {
+            "title": "Replay Final Score",
+            "type": "number"
+          },
+          "replay_rank": {
+            "title": "Replay Rank",
+            "type": "integer"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submission_id",
+          "original_final_score",
+          "replay_final_score",
+          "delta",
+          "absolute_delta",
+          "original_rank",
+          "replay_rank",
+          "rank_shift",
+          "direction"
+        ],
+        "title": "ReplayDiffSubmissionMetrics",
+        "type": "object"
+      },
+      "RepositorySubmissionSourceRequest": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "commit": {
+            "maxLength": 64,
+            "minLength": 7,
+            "title": "Commit",
+            "type": "string"
+          },
+          "repository_url": {
+            "minLength": 8,
+            "title": "Repository Url",
+            "type": "string"
+          },
+          "value_hypothesis": {
+            "minLength": 5,
+            "title": "Value Hypothesis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "value_hypothesis",
+          "repository_url",
+          "commit"
+        ],
+        "title": "RepositorySubmissionSourceRequest",
+        "type": "object"
+      },
+      "RepositorySubmissionSourceResponse": {
+        "properties": {
+          "artifact_id": {
+            "format": "uuid",
+            "title": "Artifact Id",
+            "type": "string"
+          },
+          "ingestion_job": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Ingestion Job",
+            "type": "object"
+          },
+          "resolved_commit": {
+            "title": "Resolved Commit",
+            "type": "string"
+          },
+          "submission": {
+            "$ref": "#/components/schemas/SubmissionResponse"
+          }
+        },
+        "required": [
+          "submission",
+          "artifact_id",
+          "resolved_commit",
+          "ingestion_job"
+        ],
+        "title": "RepositorySubmissionSourceResponse",
+        "type": "object"
+      },
+      "RotateChallengeKeyResponse": {
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key_last4": {
+            "title": "Key Last4",
+            "type": "string"
+          },
+          "key_prefix": {
+            "title": "Key Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "challenge_id",
+          "api_key",
+          "key_prefix",
+          "key_last4",
+          "created_at"
+        ],
+        "title": "RotateChallengeKeyResponse",
+        "type": "object"
+      },
+      "RunCancelResponse": {
+        "properties": {
+          "killed_containers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Killed Containers",
+            "type": "array"
+          },
+          "revoked_task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Revoked Task Ids",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RunState"
+          }
+        },
+        "required": [
+          "run_id",
+          "state",
+          "killed_containers",
+          "revoked_task_ids"
+        ],
+        "title": "RunCancelResponse",
+        "type": "object"
+      },
+      "RunResponse": {
+        "properties": {
+          "challenge_id": {
+            "format": "uuid",
+            "title": "Challenge Id",
+            "type": "string"
+          },
+          "config_snapshot": {
+            "additionalProperties": true,
+            "title": "Config Snapshot",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "$ref": "#/components/schemas/RunState"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "challenge_id",
+          "state",
+          "started_at",
+          "ended_at",
+          "config_snapshot",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "RunResponse",
+        "type": "object"
+      },
+      "RunState": {
+        "enum": [
+          "created",
+          "running",
+          "canceling",
+          "completed",
+          "canceled",
+          "failed"
+        ],
+        "title": "RunState",
+        "type": "string"
+      },
+      "RunStateTransitionRequest": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/RunState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "RunStateTransitionRequest",
+        "type": "object"
+      },
+      "RunTimelineResponse": {
+        "properties": {
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEvent"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "events"
+        ],
+        "title": "RunTimelineResponse",
+        "type": "object"
+      },
+      "ScoringReplayRequest": {
+        "properties": {
+          "checkpoint_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Id"
+          }
+        },
+        "title": "ScoringReplayRequest",
+        "type": "object"
+      },
+      "ScoringReplayResponse": {
+        "properties": {
+          "active_policies": {
+            "additionalProperties": true,
+            "title": "Active Policies",
+            "type": "object"
+          },
+          "active_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Active Weights",
+            "type": "object"
+          },
+          "captured_at": {
+            "format": "date-time",
+            "title": "Captured At",
+            "type": "string"
+          },
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "config_snapshot": {
+            "additionalProperties": true,
+            "title": "Config Snapshot",
+            "type": "object"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "submissions": {
+            "items": {
+              "$ref": "#/components/schemas/ScoringReplaySubmission"
+            },
+            "title": "Submissions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "run_id",
+          "checkpoint_id",
+          "captured_at",
+          "active_weights",
+          "active_policies",
+          "config_snapshot",
+          "submissions"
+        ],
+        "title": "ScoringReplayResponse",
+        "type": "object"
+      },
+      "ScoringReplaySubmission": {
+        "properties": {
+          "components": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Components",
+            "type": "object"
+          },
+          "original_final_score": {
+            "title": "Original Final Score",
+            "type": "number"
+          },
+          "replay_final_score": {
+            "title": "Replay Final Score",
+            "type": "number"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "submission_id",
+          "original_final_score",
+          "replay_final_score",
+          "components"
+        ],
+        "title": "ScoringReplaySubmission",
+        "type": "object"
+      },
+      "ScoringWeightsPayload": {
+        "properties": {
+          "criteria": {
+            "minimum": 0.0,
+            "title": "Criteria",
+            "type": "number"
+          },
+          "feasibility": {
+            "minimum": 0.0,
+            "title": "Feasibility",
+            "type": "number"
+          },
+          "novelty": {
+            "minimum": 0.0,
+            "title": "Novelty",
+            "type": "number"
+          },
+          "quality": {
+            "minimum": 0.0,
+            "title": "Quality",
+            "type": "number"
+          },
+          "similarity_penalty": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Similarity Penalty",
+            "type": "number"
+          },
+          "too_safe_penalty": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Too Safe Penalty",
+            "type": "number"
+          }
+        },
+        "required": [
+          "quality",
+          "novelty",
+          "feasibility",
+          "criteria",
+          "similarity_penalty",
+          "too_safe_penalty"
+        ],
+        "title": "ScoringWeightsPayload",
+        "type": "object"
+      },
+      "ScoringWeightsUpdateRequest": {
+        "properties": {
+          "effective_from": {
+            "format": "date-time",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "expected_config_version": {
+            "minimum": 0.0,
+            "title": "Expected Config Version",
+            "type": "integer"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/ScoringWeightsPayload"
+          }
+        },
+        "required": [
+          "expected_config_version",
+          "effective_from",
+          "weights"
+        ],
+        "title": "ScoringWeightsUpdateRequest",
+        "type": "object"
+      },
+      "ScoringWeightsUpdateResponse": {
+        "properties": {
+          "config_version": {
+            "title": "Config Version",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date-time",
+            "title": "Effective From",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "weights": {
+            "$ref": "#/components/schemas/ScoringWeightsPayload"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "effective_from",
+          "weights",
+          "config_version",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ScoringWeightsUpdateResponse",
+        "type": "object"
+      },
+      "SubmissionCreateRequest": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "value_hypothesis": {
+            "minLength": 5,
+            "title": "Value Hypothesis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "value_hypothesis"
+        ],
+        "title": "SubmissionCreateRequest",
+        "type": "object"
+      },
+      "SubmissionIngestRequest": {
+        "properties": {
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactIngestInput"
+            },
+            "minItems": 1,
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "value_hypothesis": {
+            "minLength": 5,
+            "title": "Value Hypothesis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id",
+          "value_hypothesis",
+          "artifacts"
+        ],
+        "title": "SubmissionIngestRequest",
+        "type": "object"
+      },
+      "SubmissionIngestResponse": {
+        "properties": {
+          "artifact_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Artifact Ids",
+            "type": "array"
+          },
+          "submission": {
+            "$ref": "#/components/schemas/SubmissionResponse"
+          }
+        },
+        "required": [
+          "submission",
+          "artifact_ids"
+        ],
+        "title": "SubmissionIngestResponse",
+        "type": "object"
+      },
+      "SubmissionResponse": {
+        "properties": {
+          "accepted_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted At"
+          },
+          "agent_id": {
+            "format": "uuid",
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "human_testing_required": {
+            "title": "Human Testing Required",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "run_id": {
+            "format": "uuid",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "value_hypothesis": {
+            "title": "Value Hypothesis",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "agent_id",
+          "state",
+          "value_hypothesis",
+          "summary",
+          "accepted_at",
+          "human_testing_required",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SubmissionResponse",
+        "type": "object"
+      },
+      "SubmissionState": {
+        "enum": [
+          "pending",
+          "scored",
+          "accepted",
+          "rejected"
+        ],
+        "title": "SubmissionState",
+        "type": "string"
+      },
+      "SubmissionStateTransitionRequest": {
+        "properties": {
+          "state": {
+            "$ref": "#/components/schemas/SubmissionState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "SubmissionStateTransitionRequest",
+        "type": "object"
+      },
+      "SubmissionValidationResponse": {
+        "properties": {
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "submission_id": {
+            "format": "uuid",
+            "title": "Submission Id",
+            "type": "string"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "submission_id",
+          "valid",
+          "errors"
+        ],
+        "title": "SubmissionValidationResponse",
+        "type": "object"
+      },
+      "TimelineEvent": {
+        "properties": {
+          "entity_id": {
+            "title": "Entity Id",
+            "type": "string"
+          },
+          "event_type": {
+            "title": "Event Type",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "event_type",
+          "occurred_at",
+          "entity_id",
+          "payload"
+        ],
+        "title": "TimelineEvent",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Hackathon Service",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Root  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Root",
+        "tags": [
+          "infra"
+        ]
+      }
+    },
+    "/artifacts/{artifact_id}/download": {
+      "get": {
+        "operationId": "download_artifact_artifacts__artifact_id__download_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Download Artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/artifacts/{artifact_id}/metadata": {
+      "get": {
+        "operationId": "get_artifact_metadata_artifacts__artifact_id__metadata_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactDownloadMetadataResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Artifact Metadata",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/challenges": {
+      "post": {
+        "operationId": "create_challenge_challenges_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Challenge",
+        "tags": [
+          "challenges"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}": {
+      "patch": {
+        "operationId": "update_challenge_challenges__challenge_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Challenge",
+        "tags": [
+          "challenges"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/api-keys/rotate": {
+      "post": {
+        "operationId": "rotate_challenge_api_key_challenges__challenge_id__api_keys_rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RotateChallengeKeyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Challenge Api Key",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/judge-profiles/csv": {
+      "post": {
+        "operationId": "register_judge_profiles_csv_challenges__challenge_id__judge_profiles_csv_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "text/csv": {
+              "schema": {
+                "title": "Payload",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JudgeProfileResponse"
+                  },
+                  "title": "Response Register Judge Profiles Csv Challenges  Challenge Id  Judge Profiles Csv Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Judge Profiles Csv",
+        "tags": [
+          "judging"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/judge-profiles/json": {
+      "post": {
+        "operationId": "register_judge_profiles_json_challenges__challenge_id__judge_profiles_json_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeProfileRegisterJSONRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JudgeProfileResponse"
+                  },
+                  "title": "Response Register Judge Profiles Json Challenges  Challenge Id  Judge Profiles Json Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Judge Profiles Json",
+        "tags": [
+          "judging"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/judge-profiles/url": {
+      "post": {
+        "operationId": "register_judge_profile_url_challenges__challenge_id__judge_profiles_url_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeProfileURLRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JudgeProfileResponse"
+                  },
+                  "title": "Response Register Judge Profile Url Challenges  Challenge Id  Judge Profiles Url Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Judge Profile Url",
+        "tags": [
+          "judging"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/judge-profiles/yaml": {
+      "post": {
+        "operationId": "register_judge_profiles_yaml_challenges__challenge_id__judge_profiles_yaml_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-yaml": {
+              "schema": {
+                "title": "Payload",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JudgeProfileResponse"
+                  },
+                  "title": "Response Register Judge Profiles Yaml Challenges  Challenge Id  Judge Profiles Yaml Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Judge Profiles Yaml",
+        "tags": [
+          "judging"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/runs/start": {
+      "post": {
+        "operationId": "start_run_challenges__challenge_id__runs_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "validation",
+                  "details": {
+                    "field": "reason"
+                  },
+                  "message": "Request validation failed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "budget_exhausted",
+                  "message": "Run budget exhausted"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Budget exhausted"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "sandbox_failure",
+                  "message": "Sandbox execution failed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Sandbox failure"
+          }
+        },
+        "summary": "Start Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/runs/{run_id}/cancel": {
+      "post": {
+        "operationId": "cancel_run_challenges__challenge_id__runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCancelResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/challenges/{challenge_id}/runs/{run_id}/state": {
+      "post": {
+        "operationId": "transition_run_state_challenges__challenge_id__runs__run_id__state_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "challenge_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Challenge Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunStateTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transition Run State",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "infra"
+        ]
+      }
+    },
+    "/readiness": {
+      "get": {
+        "operationId": "readiness_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness",
+        "tags": [
+          "infra"
+        ]
+      }
+    },
+    "/runs/{run_id}/analytics/agents/productivity": {
+      "get": {
+        "operationId": "get_agent_productivity_metrics_runs__run_id__analytics_agents_productivity_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentProductivityResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Agent Productivity Metrics",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/runs/{run_id}/analytics/judges/disagreement": {
+      "get": {
+        "operationId": "get_judge_disagreement_metrics_runs__run_id__analytics_judges_disagreement_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JudgeDisagreementResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Judge Disagreement Metrics",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/runs/{run_id}/analytics/replay/diff": {
+      "get": {
+        "operationId": "get_replay_diff_metrics_runs__run_id__analytics_replay_diff_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "checkpoint_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Checkpoint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayDiffResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Replay Diff Metrics",
+        "tags": [
+          "analytics"
+        ]
+      }
+    },
+    "/runs/{run_id}/export": {
+      "get": {
+        "operationId": "export_run_bundle_runs__run_id__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Run Bundle",
+        "tags": [
+          "export"
+        ]
+      }
+    },
+    "/runs/{run_id}/leaderboard": {
+      "get": {
+        "operationId": "get_leaderboard_runs__run_id__leaderboard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Leaderboard",
+        "tags": [
+          "leaderboard"
+        ]
+      }
+    },
+    "/runs/{run_id}/leaderboard/paginated": {
+      "get": {
+        "operationId": "get_leaderboard_paginated_runs__run_id__leaderboard_paginated_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedLeaderboardResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Leaderboard Paginated",
+        "tags": [
+          "leaderboard"
+        ]
+      }
+    },
+    "/runs/{run_id}/mvp-bundles": {
+      "get": {
+        "operationId": "get_mvp_bundles_runs__run_id__mvp_bundles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MVPBundlesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Mvp Bundles",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/runs/{run_id}/realtime/sse": {
+      "get": {
+        "operationId": "stream_run_realtime_updates_sse_runs__run_id__realtime_sse_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Run Realtime Updates Sse",
+        "tags": [
+          "realtime"
+        ]
+      }
+    },
+    "/runs/{run_id}/replay": {
+      "post": {
+        "operationId": "replay_run_scoring_runs__run_id__replay_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoringReplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoringReplayResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "validation",
+                  "details": {
+                    "field": "reason"
+                  },
+                  "message": "Request validation failed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "scoring_unavailable",
+                  "message": "Scoring backend temporarily unavailable"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Scoring unavailable"
+          }
+        },
+        "summary": "Replay Run Scoring",
+        "tags": [
+          "scoring"
+        ]
+      }
+    },
+    "/runs/{run_id}/scoring-weights": {
+      "post": {
+        "operationId": "update_scoring_weights_runs__run_id__scoring_weights_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoringWeightsUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoringWeightsUpdateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "validation",
+                  "details": {
+                    "field": "reason"
+                  },
+                  "message": "Request validation failed"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": "scoring_unavailable",
+                  "message": "Scoring backend temporarily unavailable"
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/APIErrorModel"
+                }
+              }
+            },
+            "description": "Scoring unavailable"
+          }
+        },
+        "summary": "Update Scoring Weights",
+        "tags": [
+          "scoring"
+        ]
+      }
+    },
+    "/runs/{run_id}/submissions": {
+      "post": {
+        "operationId": "create_submission_runs__run_id__submissions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Submission",
+        "tags": [
+          "submissions"
+        ]
+      }
+    },
+    "/runs/{run_id}/submissions/ingest": {
+      "post": {
+        "operationId": "ingest_submission_transactional_runs__run_id__submissions_ingest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionIngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionIngestResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ingest Submission Transactional",
+        "tags": [
+          "submissions"
+        ]
+      }
+    },
+    "/runs/{run_id}/submissions/repository-source": {
+      "post": {
+        "operationId": "attach_repository_submission_source_runs__run_id__submissions_repository_source_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepositorySubmissionSourceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositorySubmissionSourceResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach Repository Submission Source",
+        "tags": [
+          "submissions"
+        ]
+      }
+    },
+    "/runs/{run_id}/submissions/{submission_id}/state": {
+      "post": {
+        "operationId": "transition_submission_state_runs__run_id__submissions__submission_id__state_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "submission_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Submission Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionStateTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Transition Submission State",
+        "tags": [
+          "submissions"
+        ]
+      }
+    },
+    "/runs/{run_id}/timeline": {
+      "get": {
+        "operationId": "get_run_timeline_runs__run_id__timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunTimelineResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Timeline",
+        "tags": [
+          "run"
+        ]
+      }
+    },
+    "/submissions/{submission_id}/artifacts": {
+      "post": {
+        "operationId": "upload_artifact_submissions__submission_id__artifacts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submission_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Submission Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "artifact_type",
+            "required": true,
+            "schema": {
+              "title": "Artifact Type",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_artifact_submissions__submission_id__artifacts_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactUploadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Artifact",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    },
+    "/submissions/{submission_id}/validation": {
+      "get": {
+        "operationId": "validate_submission_mandatory_requirements_submissions__submission_id__validation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "submission_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Submission Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionValidationResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Submission Mandatory Requirements",
+        "tags": [
+          "artifacts"
+        ]
+      }
+    }
+  }
+}

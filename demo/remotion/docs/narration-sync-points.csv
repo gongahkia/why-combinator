@@ -1,0 +1,11 @@
+segment,start_seconds,end_seconds,start_frame,end_frame,voiceover
+intro_hook,0,12,0,359,"Autonomous orchestration takes a challenge from brief to judged leaderboard with deterministic scoring."
+challenge_setup,12,24,360,719,"Organizers set challenge constraints, risk posture, and quality targets before execution starts."
+run_start,24,36,720,1079,"Run start captures a deterministic seed and frozen snapshot for reproducible replay."
+agent_execution,36,48,1080,1439,"Hacker and subagents execute in isolated sandboxes with budget controls and checkpoints."
+judge_ingestion,48,60,1440,1799,"Judge profiles ingest from mixed formats while URL guards block unsafe redirect chains."
+checkpoint_scoring,60,72,1800,2159,"Checkpoint scoring blends quality and novelty with anti-gaming penalties."
+replay_analytics,72,84,2160,2519,"Replay diffs compare original and rerun outputs to confirm deterministic behavior."
+leaderboard_realtime,84,96,2520,2879,"Realtime leaderboard updates remain stable under concurrent writes and segment filters."
+artifact_retrieval,96,108,2880,3239,"Approved artifacts use short-lived signed URLs while blocked uploads are quarantined."
+closing_cta,108,120,3240,3599,"The flow is fully automated, observable, and reproducible in a two-minute demo."

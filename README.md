@@ -1,120 +1,76 @@
-[![](https://img.shields.io/badge/why--combinator_1.0.0-passing-green)](https://github.com/gongahkia/why-combinator/releases/tag/1.0.0)
-![](https://github.com/gongahkia/why-combinator/actions/workflows/ci.yml/badge.svg)
+[![](https://img.shields.io/badge/why--combinator_2.0.0-integrated-green)](https://github.com/gongahkia/why-combinator)
+![](https://img.shields.io/badge/status-active-blue)
 
 # `Why-Combinator`
 
-[CLI](https://aws.amazon.com/what-is/cli/)-first [multi-agent](#architecture) startup simulation engine.
+[CLI](https://aws.amazon.com/what-is/cli/)-first and API-first multi-agent hackathon orchestration platform with integrated market-simulation analytics.
 
 ## Stack
 
-* *Core*: [Python](https://www.python.org/), [asyncio](https://docs.python.org/3/library/asyncio.html), [Typer](https://typer.tiangolo.com/), [Rich](https://github.com/Textualize/rich), [TinyDB](https://tinydb.readthedocs.io/)
-* *LLM Providers*: [OpenAI](https://platform.openai.com/), [Anthropic](https://www.anthropic.com/), [Ollama](https://ollama.com/), [HuggingFace](https://huggingface.co/)
-* *Networking*: [httpx](https://www.python-httpx.org/)
-* *Config*: [python-dotenv](https://github.com/theskumar/python-dotenv), [TOML templates](https://toml.io/)
-* *Testing*: [pytest](https://docs.pytest.org/), [pytest-asyncio](https://github.com/pytest-dev/pytest-asyncio), [mypy](https://mypy-lang.org/)
-* *CI/CD*: [GitHub Actions](https://github.com/features/actions)
+* *Core Runtime*: [Python](https://www.python.org/), [FastAPI](https://fastapi.tiangolo.com/), [SQLAlchemy](https://www.sqlalchemy.org/), [Celery](https://docs.celeryq.dev/), [Redis](https://redis.io/)
+* *Agent Orchestration*: sandboxed hacker-agent execution, subagent graphing, deterministic replay seeds
+* *Judging + Scoring*: weighted panel scoring, novelty/anti-gaming penalties, checkpoint snapshots, replay diff analytics
+* *Market Simulation Bridge*: [why-combinator](https://github.com/gongahkia/why-combinator) compatibility layer for adoption/churn/runway stress testing
+* *Demo Layer*: [Remotion](https://www.remotion.dev/) 120-second product walkthrough pipeline
+* *Testing*: [pytest](https://docs.pytest.org/)
 
 ## What `Why-Combinator` can do *([for now](https://github.com/gongahkia/why-combinator/issues))*
 
-* **Multi-agent simulation**: 11 stakeholder archetypes *(customer, investor, competitor, regulator, employee, partner, critic, media, supplier, advisor)* with LLM-driven reasoning
-* **Startup templates**: Pre-built scenarios for SaaS, fintech, marketplace and hardware startups
-* **Economic modeling**: CAC, LTV, burn rate, runway, churn, retention, market share and revenue models *(subscription, transaction, one-time)*
-* **Live TUI dashboard**: Real-time Rich-based dashboard with metrics, agent roster, event log and sentiment indicators
-* **Agent relationships**: Relationship graphs, coalition detection, sentiment tracking, emergence detection and debate sessions
-* **Simulation lifecycle**: Multi-phase transitions *(idea, MVP, launch, growth, scale, exit)* with seasonal multipliers and market saturation
-* **Checkpointing**: Save/resume simulations, reproducible runs via seed, LLM response caching
-* **Analytics**: Compare multiple simulations, custom metric builders, scenario branching
-* **API**: Python-first API via `why_combinator.api` with `ProgressCallback` protocol for headless/batch usage
-
-## Screenshots
-
-<div align="center">
-    <img src="./asset/reference/20_run_help.png" width="32%">
-    <img src="./asset/reference/02_simulate_help.png" width="32%">
-    <img src="./asset/reference/03_tutorial.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/04_saas_dry_run.png" width="32%">
-    <img src="./asset/reference/05_fintech_dry_run.png" width="32%">
-    <img src="./asset/reference/06_hardware_dry_run.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/08_simulation_list.png" width="32%">
-    <img src="./asset/reference/09_simulation_history.png" width="32%">
-    <img src="./asset/reference/11_agent_inspect.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/07_marketplace_dry_run.png" width="32%">
-    <img src="./asset/reference/10_simulation_status.png" width="32%">
-    <img src="./asset/reference/12_logs_all.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/13_logs_buy.png" width="32%">
-    <img src="./asset/reference/14_logs_complain.png" width="32%">
-    <img src="./asset/reference/15_compare.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/16_json_status.png" width="32%">
-    <img src="./asset/reference/01_main_help.png" width="32%">
-    <img src="./asset/reference/17_json_logs.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/19_export_csv.png" width="32%">
-    <img src="./asset/reference/18_export_md.png" width="32%">
-</div>
+* **Hackathon control plane**: Create challenges, configure risk/complexity controls, define iteration windows, and enforce minimum quality bars.
+* **Parallel hacker execution**: Run multi-agent hacker flows with sandbox isolation, admission controls, and subagent spawning.
+* **Judge system orchestration**: Ingest judge profiles via JSON/YAML/CSV/URL, enforce versioning, and apply domain-aware scoring.
+* **Anti-convergence scoring**: Compute novelty, similarity penalties, and too-safe penalties with replay-safe checkpoint snapshots.
+* **Realtime ranking**: Materialize leaderboards with cursor stability and segmentation labels.
+* **Artifact governance**: Enforce malware quarantine, signed downloads, and retention policies.
+* **Deterministic replay analytics**: Recompute and diff checkpoint scores with frozen snapshots.
+* **Market simulation overlay**: `POST /runs/{run_id}/analytics/market-simulation` maps run constraints into startup-market stress metrics (adoption, churn, burn, runway, recommendation).
+* **Demo production**: Reproducible 1080p render pipeline with captions, narration sync points, and QA checks.
 
 ## Usage
 
-1. Clone the repo and install.
+1. Clone and install dependencies.
 
 ```console
 $ git clone https://github.com/gongahkia/why-combinator && cd why-combinator
 $ pip install -e .
-$ pip install -e ".[dev]"
 ```
 
-2. Configure LLM provider via `.env`.
+2. Configure infrastructure environment.
 
 ```bash
-OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-OLLAMA_BASE_URL=http://localhost:11434
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/hackathon
+REDIS_URL=redis://localhost:6379/0
+WHY_COMBINATOR_REPO_PATH=/absolute/path/to/why-combinator  # optional bridge override
 ```
 
-3. Run simulations.
+3. Run the API service.
 
 ```console
-$ why-combinator simulate tutorial --auto
-$ why-combinator simulate new --template saas
-$ why-combinator simulate run <id> --model ollama:llama3
-$ why-combinator simulate status <id>
-$ why-combinator simulate logs <id>
-$ why-combinator simulate compare <id1> <id2>
-$ why-combinator simulate export <id> --format json
+$ uvicorn app.main:app --reload
 ```
 
-4. Run tests.
+4. Typical flow.
 
 ```console
-$ pytest tests/
+$ curl -X POST http://localhost:8000/challenges ...
+$ curl -X POST http://localhost:8000/challenges/<challenge_id>/runs/start
+$ curl -X POST http://localhost:8000/runs/<run_id>/analytics/market-simulation -d '{"model":"mock"}'
+$ curl http://localhost:8000/runs/<run_id>/analytics/replay/diff
+```
+
+5. Run tests.
+
+```console
+$ pytest -q
 ```
 
 ## Architecture
 
-<div align="center">
-    <img src="./asset/reference/architecture.png">
-</div>
+- Challenge + run orchestration in `app/api`, `app/orchestrator`, `app/queue`
+- Scoring and replay in `app/scoring`
+- Market-simulation bridge in `app/integrations/why_combinator_bridge.py`
+- Demo pipeline in `demo/remotion`
 
 ## Reference
 
-The name `Why-Combinator` is in reference to the startup accelerator [Y Combinator](https://www.ycombinator.com/). 
-
-<div align="center">
-    <img src="./asset/logo/Y.png" width="15%">
-</div>
+`Why-Combinator` began as a startup-simulation engine and now serves as an integrated hackathon orchestration + judging + market-simulation platform.

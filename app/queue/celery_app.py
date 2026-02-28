@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from celery import Celery
+
+from app.config import load_settings
+
+settings = load_settings()
+
+celery_app = Celery(
+    "hackathon",
+    broker=settings.redis_url,
+    backend=settings.redis_url,
+    include=["app.queue.jobs"],
+)
+
+celery_app.conf.update(
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+    task_track_started=True,
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
+    task_routes={
+        "app.queue.jobs.hacker_run": {"queue": "hacker-run"},
+        "app.queue.jobs.judge_run": {"queue": "judge-run"},
+        "app.queue.jobs.checkpoint_score": {"queue": "checkpoint-score"},
+        "app.queue.jobs.backfill_failed_checkpoints": {"queue": "checkpoint-backfill"},
+        "app.queue.jobs.relay_outbox_events": {"queue": "outbox-relay"},
+        "app.queue.jobs.scheduler_heartbeat_monitor": {"queue": "scheduler-monitor"},
+        "app.queue.jobs.run_heartbeat_watchdog": {"queue": "run-heartbeat-watchdog"},
+        "app.queue.jobs.cleanup_sandbox_resources": {"queue": "sandbox-cleanup"},
+        "app.queue.jobs.complete_run": {"queue": "run-complete"},
+        "app.queue.jobs.score_submission": {"queue": "score-submission"},
+        "app.queue.jobs.recover_orphaned_tasks": {"queue": "recovery"},
+    },
+)
