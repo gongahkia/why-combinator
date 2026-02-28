@@ -11,6 +11,7 @@ class Settings:
     pg_pool_size: int
     pg_max_overflow: int
     default_run_budget_units: int
+    artifact_storage_path: str
 
 
 
@@ -24,4 +25,5 @@ def load_settings() -> Settings:
         pg_pool_size=int(os.getenv("PG_POOL_SIZE", "10")),
         pg_max_overflow=int(os.getenv("PG_MAX_OVERFLOW", "20")),
         default_run_budget_units=int(os.getenv("DEFAULT_RUN_BUDGET_UNITS", "1000")),
+        artifact_storage_path=os.getenv("ARTIFACT_STORAGE_PATH", "/tmp/hackathon-artifacts"),
     )

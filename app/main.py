@@ -7,6 +7,7 @@ import redis.asyncio as redis
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
+from app.api.artifacts import router as artifacts_router
 from app.api.challenges import router as challenges_router
 from app.api.judges import router as judges_router
 from app.api.runs import router as runs_router
@@ -45,6 +46,7 @@ app.include_router(challenges_router)
 app.include_router(judges_router)
 app.include_router(runs_router)
 app.include_router(scoring_router)
+app.include_router(artifacts_router)
 
 
 @app.get("/", tags=["infra"])
