@@ -22,6 +22,7 @@ def test_budget_exhaustion_blocks_new_tasks_but_allows_finalization(monkeypatch)
 
     monkeypatch.setattr(queue_jobs, "_with_budget_guard", fake_budget_guard)
     monkeypatch.setattr(queue_jobs, "run_complete_run_job", fake_complete_run_job)
+    monkeypatch.setattr(queue_jobs, "_record_run_worker_heartbeat", lambda run_id: None)
 
     blocked = queue_jobs.hacker_run.run("run-1", "trace-budget")
     assert blocked["status"] == "budget_exhausted"

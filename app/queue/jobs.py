@@ -5,6 +5,7 @@ import os
 import threading
 import time
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from celery import shared_task, signals
@@ -21,6 +22,7 @@ from app.orchestrator.jobs import (
     run_judge_job,
     run_outbox_relay_job,
     run_scheduler_heartbeat_monitor_job,
+    run_stale_run_heartbeat_watchdog_job,
 )
 from app.queue.checkpoint_backfill import (
     clear_failed_checkpoint_backfill,
@@ -41,6 +43,7 @@ from app.queue.recovery import (
     remove_recoverable_task,
     track_in_flight_task,
 )
+from app.scheduler.run_timeout import run_worker_heartbeat_key
 from app.sandbox.concurrency import acquire_run_hacker_container_slot, release_run_hacker_container_slot
 
 _ACTIVE_TASK_IDS: set[str] = set()
@@ -233,6 +236,14 @@ def _checkpoint_run_lock_key(run_id: str) -> str:
     return f"lock:checkpoint-score:{run_id}"
 
 
+def _record_run_worker_heartbeat(run_id: str) -> None:
+    redis_client = create_redis_client()
+    try:
+        redis_client.set(run_worker_heartbeat_key(run_id), datetime.now(UTC).isoformat())
+    finally:
+        redis_client.close()
+
+
 def load_checkpoint_backfill_max_enqueues() -> int:
     return int(os.getenv("CHECKPOINT_BACKFILL_MAX_ENQUEUES", "25"))
 
@@ -299,6 +310,7 @@ def hacker_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]
     effective_trace_id = ensure_trace_id(trace_id)
     max_retries = 3
     try:
+        _record_run_worker_heartbeat(run_id)
         accepted, payload = _with_budget_guard(run_id, "hacker-run", default_cost=10)
         if not accepted:
             return {**payload, "trace_id": effective_trace_id}
@@ -341,6 +353,7 @@ def judge_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
     max_retries = 3
     try:
+        _record_run_worker_heartbeat(run_id)
         accepted, payload = _with_budget_guard(run_id, "judge-run", default_cost=5)
         if not accepted:
             return {**payload, "trace_id": effective_trace_id}
@@ -362,6 +375,7 @@ def judge_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
 def checkpoint_score(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
     max_retries = 3
+    _record_run_worker_heartbeat(run_id)
     accepted, payload = _with_budget_guard(run_id, "checkpoint-score", default_cost=2)
     if not accepted:
         return {**payload, "trace_id": effective_trace_id}
@@ -499,7 +513,20 @@ def scheduler_heartbeat_monitor(self, trace_id: str | None = None) -> dict[str, 
 )
 def complete_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
+    _record_run_worker_heartbeat(run_id)
     return run_complete_run_job(run_id, trace_id=effective_trace_id)
+
+
+@shared_task(
+    name="app.queue.jobs.run_heartbeat_watchdog",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def run_heartbeat_watchdog(self, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
+    return run_stale_run_heartbeat_watchdog_job(trace_id=effective_trace_id)
 
 
 def enqueue_submission_score_job(

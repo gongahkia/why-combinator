@@ -48,6 +48,7 @@ def test_checkpoint_score_queues_dependency_failure_for_backfill(monkeypatch) ->
 
     monkeypatch.setattr(queue_jobs, "_with_budget_guard", lambda run_id, task_name, default_cost: (True, {}))  # noqa: ARG005
     monkeypatch.setattr(queue_jobs, "create_redis_client", lambda: fake_redis)
+    monkeypatch.setattr(queue_jobs, "_record_run_worker_heartbeat", lambda run_id: None)
 
     def _raise_dependency_failure(run_id: str, trace_id: str | None = None) -> dict[str, str]:  # noqa: ARG001
         raise RuntimeError("database connection refused")

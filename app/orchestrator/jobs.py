@@ -17,6 +17,7 @@ from app.orchestrator.run_completion import complete_run
 from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
 from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
+from app.scheduler.run_timeout import fail_stale_runs_without_worker_heartbeat
 from app.scoring.checkpoint import run_checkpoint_scoring_worker
 from app.security.secrets import build_scoped_model_secret_env
 from app.validation.model_schema import ModelResponseValidationError, validate_hacker_response_json
@@ -206,6 +207,31 @@ def run_scheduler_heartbeat_monitor_job(trace_id: str | None = None) -> dict[str
     details = asyncio.run(_run())
     return {
         "job_type": "scheduler-heartbeat-monitor",
+        "status": "completed",
+        "trace_id": trace_id or "",
+        **details,
+    }
+
+
+def run_stale_run_heartbeat_watchdog_job(trace_id: str | None = None) -> dict[str, str]:
+    async def _run() -> dict[str, str]:
+        settings = load_settings()
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        redis_client = redis_async.from_url(settings.redis_url, decode_responses=True)
+        try:
+            async with session_factory() as session:
+                failed_runs = await fail_stale_runs_without_worker_heartbeat(session, redis_client)
+        finally:
+            await redis_client.aclose()
+            await engine.dispose()
+        return {
+            "failed_runs": str(len(failed_runs)),
+        }
+
+    details = asyncio.run(_run())
+    return {
+        "job_type": "run-heartbeat-watchdog",
         "status": "completed",
         "trace_id": trace_id or "",
         **details,
