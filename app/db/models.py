@@ -22,6 +22,7 @@ class Challenge(TimestampMixin, Base):
     complexity_slider: Mapped[float] = mapped_column(Float, nullable=False)
 
     runs: Mapped[list[Run]] = relationship(back_populates="challenge", cascade="all, delete-orphan")
+    judge_profiles: Mapped[list[JudgeProfile]] = relationship(back_populates="challenge", cascade="all, delete-orphan")
 
 
 class Run(TimestampMixin, Base):
@@ -138,3 +139,19 @@ class ScoringWeightConfig(TimestampMixin, Base):
     weights: Mapped[dict[str, float]] = mapped_column(JSON, nullable=False)
 
     run: Mapped[Run] = relationship(back_populates="scoring_weight_configs")
+
+
+class JudgeProfile(TimestampMixin, Base):
+    __tablename__ = "judge_profiles"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    challenge_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("challenges.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    scoring_style: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    head_judge: Mapped[bool] = mapped_column(default=False, nullable=False)
+    source_type: Mapped[str] = mapped_column(String(32), nullable=False, default="inline_json")
+
+    challenge: Mapped[Challenge] = relationship(back_populates="judge_profiles")

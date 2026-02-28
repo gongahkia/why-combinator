@@ -1,4 +1,3 @@
-(A) Implement API endpoint to register judge profiles from inline JSON payload +api +judging
 (A) Implement API endpoint to register judge profiles from YAML payload parsed into canonical schema +api +judging
 (A) Implement API endpoint to register judge profiles from CSV payload mapped to canonical schema +api +judging
 (A) Implement API endpoint to register judge profile from URL by fetching via curl subprocess with timeout and size limit +api +ingest
