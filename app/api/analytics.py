@@ -12,6 +12,12 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_db_session
 from app.db.enums import SubmissionState
 from app.db.models import Agent, JudgeProfile, JudgeScore, PenaltyEvent, Run, Submission
+from app.scoring.replay import (
+    ReplayNotFoundError,
+    ReplayValidationError,
+    generate_replay_score_deltas,
+    replay_scoring_from_frozen_snapshot,
+)
 
 router = APIRouter(prefix="/runs", tags=["analytics"])
 
@@ -48,6 +54,24 @@ class JudgeDisagreementResponse(BaseModel):
     run_id: uuid.UUID
     judge_metrics: list[JudgeDisagreementMetrics]
     checkpoint_variance: list[CheckpointVarianceMetrics]
+
+
+class ReplayDiffSubmissionMetrics(BaseModel):
+    submission_id: uuid.UUID
+    original_final_score: float
+    replay_final_score: float
+    delta: float
+    absolute_delta: float
+    original_rank: int
+    replay_rank: int
+    rank_shift: int
+    direction: str
+
+
+class ReplayDiffResponse(BaseModel):
+    run_id: uuid.UUID
+    checkpoint_id: str
+    submissions: list[ReplayDiffSubmissionMetrics]
 
 
 @router.get("/{run_id}/analytics/agents/productivity", response_model=AgentProductivityResponse)
@@ -180,4 +204,42 @@ async def get_judge_disagreement_metrics(
         run_id=run_id,
         judge_metrics=judge_metrics,
         checkpoint_variance=checkpoint_metrics,
+    )
+
+
+@router.get("/{run_id}/analytics/replay/diff", response_model=ReplayDiffResponse)
+async def get_replay_diff_metrics(
+    run_id: uuid.UUID,
+    checkpoint_id: str | None = None,
+    session: AsyncSession = Depends(get_db_session),
+) -> ReplayDiffResponse:
+    try:
+        replay = await replay_scoring_from_frozen_snapshot(
+            session,
+            run_id=run_id,
+            checkpoint_id=checkpoint_id,
+        )
+    except ReplayNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReplayValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    diffs = generate_replay_score_deltas(replay)
+    return ReplayDiffResponse(
+        run_id=run_id,
+        checkpoint_id=replay.checkpoint_id,
+        submissions=[
+            ReplayDiffSubmissionMetrics(
+                submission_id=row.submission_id,
+                original_final_score=row.original_final_score,
+                replay_final_score=row.replay_final_score,
+                delta=row.delta,
+                absolute_delta=row.absolute_delta,
+                original_rank=row.original_rank,
+                replay_rank=row.replay_rank,
+                rank_shift=row.rank_shift,
+                direction=row.direction,
+            )
+            for row in diffs
+        ],
     )

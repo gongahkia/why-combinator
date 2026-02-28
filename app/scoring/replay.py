@@ -39,6 +39,19 @@ class ReplayScoringResult:
     submissions: list[ReplaySubmissionResult]
 
 
+@dataclass(frozen=True)
+class ReplayScoreDelta:
+    submission_id: uuid.UUID
+    original_final_score: float
+    replay_final_score: float
+    delta: float
+    absolute_delta: float
+    original_rank: int
+    replay_rank: int
+    rank_shift: int
+    direction: str
+
+
 def _coerce_float(value: object, name: str) -> float:
     if not isinstance(value, (int, float)):
         raise ReplayValidationError(f"{name} must be numeric")
@@ -186,3 +199,45 @@ async def replay_scoring_from_frozen_snapshot(
         config_snapshot=config_snapshot,
         submissions=replay_submissions,
     )
+
+
+def generate_replay_score_deltas(replay: ReplayScoringResult) -> list[ReplayScoreDelta]:
+    original_sorted = sorted(
+        replay.submissions,
+        key=lambda row: (-row.original_final_score, str(row.submission_id)),
+    )
+    replay_sorted = sorted(
+        replay.submissions,
+        key=lambda row: (-row.replay_final_score, str(row.submission_id)),
+    )
+    original_ranks = {row.submission_id: index + 1 for index, row in enumerate(original_sorted)}
+    replay_ranks = {row.submission_id: index + 1 for index, row in enumerate(replay_sorted)}
+
+    deltas = []
+    for row in replay.submissions:
+        delta = round(row.replay_final_score - row.original_final_score, 6)
+        original_rank = original_ranks[row.submission_id]
+        replay_rank = replay_ranks[row.submission_id]
+        rank_shift = replay_rank - original_rank
+        if delta > 0:
+            direction = "up"
+        elif delta < 0:
+            direction = "down"
+        else:
+            direction = "unchanged"
+        deltas.append(
+            ReplayScoreDelta(
+                submission_id=row.submission_id,
+                original_final_score=row.original_final_score,
+                replay_final_score=row.replay_final_score,
+                delta=delta,
+                absolute_delta=abs(delta),
+                original_rank=original_rank,
+                replay_rank=replay_rank,
+                rank_shift=rank_shift,
+                direction=direction,
+            )
+        )
+
+    deltas.sort(key=lambda row: (-row.absolute_delta, str(row.submission_id)))
+    return deltas
