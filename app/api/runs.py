@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session
 from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
+from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 
 router = APIRouter(prefix="/challenges", tags=["runs"])
@@ -79,6 +80,8 @@ async def start_run(
         config_snapshot=config_snapshot,
     )
     session.add(run)
+    await session.flush()
+    baseline_rows = await run_baseline_idea_generator_job(session, run, challenge)
     await session.commit()
     await session.refresh(run)
 
@@ -88,6 +91,7 @@ async def start_run(
         "run_id": str(run.id),
         "challenge_id": str(challenge_id),
         "config_snapshot": config_snapshot,
+        "baseline_vector_count": len(baseline_rows),
     }
     await request.app.state.redis.publish("run_events", json.dumps(event))
 

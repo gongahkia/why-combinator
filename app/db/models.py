@@ -42,6 +42,22 @@ class Run(TimestampMixin, Base):
     scoring_weight_configs: Mapped[list[ScoringWeightConfig]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
+    baseline_idea_vectors: Mapped[list[BaselineIdeaVector]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class BaselineIdeaVector(TimestampMixin, Base):
+    __tablename__ = "baseline_idea_vectors"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    idea_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    idea_text: Mapped[str] = mapped_column(Text, nullable=False)
+    vector: Mapped[list[float]] = mapped_column(JSON, nullable=False)
+    prompt_template: Mapped[str] = mapped_column(Text, nullable=False)
+
+    run: Mapped[Run] = relationship(back_populates="baseline_idea_vectors")
 
 
 class Agent(TimestampMixin, Base):

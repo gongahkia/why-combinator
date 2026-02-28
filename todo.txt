@@ -1,4 +1,3 @@
-(A) Implement baseline idea generator job at run start using Codex agent prompt template and store baseline vectors +orchestrator +novelty
 (A) Implement HackerAgent runner that executes each agent in isolated Docker container with cpu/memory/time limits +sandbox +agents
 (A) Implement per-run compute budget ledger in Redis and deny new tasks when budget is exhausted +budget +queue
 (A) Implement per-agent compute quota checks before spawning subagents +budget +agents

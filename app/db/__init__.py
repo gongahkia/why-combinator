@@ -2,6 +2,7 @@ from app.db.base import Base
 from app.db.models import (
     Agent,
     Artifact,
+    BaselineIdeaVector,
     Challenge,
     JudgeProfile,
     PenaltyEvent,
@@ -15,6 +16,7 @@ from app.db.models import (
 __all__ = [
     "Agent",
     "Artifact",
+    "BaselineIdeaVector",
     "Base",
     "Challenge",
     "JudgeProfile",
