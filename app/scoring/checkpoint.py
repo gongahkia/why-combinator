@@ -11,6 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Artifact, Challenge, Run, ScoreEvent, Submission
 from app.judging.worker import run_judge_scoring_worker
 from app.leaderboard.materializer import materialize_leaderboard
+from app.orchestrator.policy import (
+    apply_risk_appetite_novelty_penalty_sensitivity,
+    resolve_novelty_penalty_sensitivity_policy,
+)
 from app.scoring.anti_gaming import detect_template_clone_penalty
 from app.scoring.checkpoint_snapshot import capture_checkpoint_snapshot
 from app.scoring.events import create_score_event_idempotent
@@ -120,10 +124,14 @@ async def run_checkpoint_scoring_worker(
 
     active_weights_snapshot = await resolve_active_weights_snapshot(session, run_id, now)
     active_weights = asdict(active_weights_snapshot)
+    novelty_policy = resolve_novelty_penalty_sensitivity_policy(challenge.risk_appetite)
     active_policies: dict[str, object] = {
         "risk_appetite": challenge.risk_appetite,
         "complexity_slider": challenge.complexity_slider,
         "minimum_quality_threshold": challenge.minimum_quality_threshold,
+        "novelty_similarity_threshold": novelty_policy.similarity_threshold,
+        "novelty_too_safe_threshold": novelty_policy.too_safe_threshold,
+        "novelty_penalty_sensitivity_multiplier": novelty_policy.sensitivity_multiplier,
     }
     effective_config_checksum = _build_effective_config_checksum(active_weights, active_policies)
     await capture_checkpoint_snapshot(
@@ -172,6 +180,13 @@ async def run_checkpoint_scoring_worker(
         too_safe_score = await score_too_safe_penalty(session, submission.id)
         novelty_score = normalize_novelty_score(1.0 - similarity_score.max_similarity)
         combined_similarity_penalty = max(similarity_score.max_similarity, anti_gaming_score.penalty)
+        adjusted_similarity_penalty, adjusted_too_safe_penalty, applied_novelty_policy = (
+            apply_risk_appetite_novelty_penalty_sensitivity(
+                challenge.risk_appetite,
+                combined_similarity_penalty,
+                too_safe_score.too_safe_penalty,
+            )
+        )
         feasibility_score = score_feasibility(
             runtime_signals=[
                 RuntimeValidationSignal(
@@ -189,8 +204,8 @@ async def run_checkpoint_scoring_worker(
             novelty=novelty_score,
             feasibility=feasibility_score,
             criteria=criteria_score,
-            similarity_penalty=combined_similarity_penalty,
-            too_safe_penalty=too_safe_score.too_safe_penalty,
+            similarity_penalty=adjusted_similarity_penalty,
+            too_safe_penalty=adjusted_too_safe_penalty,
             non_production_penalty=0.0,
         )
         breakdown = compose_final_score(components, active_weights_snapshot)
@@ -202,6 +217,13 @@ async def run_checkpoint_scoring_worker(
         payload["anti_gaming_matched_submission_id"] = (
             str(anti_gaming_score.matched_submission_id) if anti_gaming_score.matched_submission_id else None
         )
+        payload["raw_similarity_penalty"] = combined_similarity_penalty
+        payload["raw_too_safe_penalty"] = too_safe_score.too_safe_penalty
+        payload["novelty_policy"] = {
+            "similarity_threshold": applied_novelty_policy.similarity_threshold,
+            "too_safe_threshold": applied_novelty_policy.too_safe_threshold,
+            "sensitivity_multiplier": applied_novelty_policy.sensitivity_multiplier,
+        }
 
         await _persist_submission_checkpoint_writes_atomic(
             session,

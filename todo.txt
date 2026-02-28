@@ -1,4 +1,3 @@
-(A) Implement policy engine for risk appetite that adjusts novelty penalty sensitivity thresholds dynamically +policy +scoring
 (A) Implement policy engine for complexity slider that scales expected artifact sophistication rubric +policy +scoring
 (A) Implement minimum viable README validator enforcing bounded length and required sections via parser +validation +submissions
 (A) Implement value hypothesis validator enforcing measurable outcome statement pattern checks +validation +submissions
