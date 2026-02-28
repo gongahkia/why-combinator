@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import AgentRole, ArtifactType, RunState, SubmissionState
 from app.db.models import Agent, Artifact, BaselineIdeaVector, Challenge, Run, Submission
-from app.scoring.final_score import ScoreComponents, compose_final_score
+from app.scoring.final_score import ScoreComponents, compose_final_score, load_score_component_bounds
 from app.scoring.similarity import build_submission_similarity_vector, cosine_similarity, score_submission_similarity
 from app.scoring.too_safe import score_too_safe_penalty
 from app.scoring.weights import DEFAULT_WEIGHTS
@@ -107,8 +107,11 @@ async def test_similarity_and_too_safe_penalties_compose_into_weighted_penalties
         ),
         DEFAULT_WEIGHTS,
     )
+    score_bounds = load_score_component_bounds()
+    bounded_similarity = min(similarity_score.max_similarity, score_bounds.similarity_penalty_cap)
+    bounded_too_safe = min(too_safe_score.too_safe_penalty, score_bounds.too_safe_penalty_cap)
     expected_penalties = (
-        similarity_score.max_similarity * DEFAULT_WEIGHTS.similarity_penalty
-        + too_safe_score.too_safe_penalty * DEFAULT_WEIGHTS.too_safe_penalty
+        bounded_similarity * DEFAULT_WEIGHTS.similarity_penalty
+        + bounded_too_safe * DEFAULT_WEIGHTS.too_safe_penalty
     )
     assert breakdown.weighted_penalties == pytest.approx(expected_penalties, abs=1e-6)
