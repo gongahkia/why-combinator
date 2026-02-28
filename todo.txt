@@ -1,4 +1,3 @@
-(A) Implement API endpoint returning all MVP bundles and artifact download links for accepted submissions +api +artifacts
 (A) Implement API endpoint returning run timeline events including spawn, submit, score, and weight-change checkpoints +api +run
 (A) Implement human-testing-required flag on submissions when runtime validation fails or is skipped by executor +validation +submissions
 (A) Implement runtime validator subagent workflow for CLI artifacts that executes declared command and captures exit code +validation +agents

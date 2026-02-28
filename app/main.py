@@ -11,6 +11,7 @@ from app.api.artifacts import router as artifacts_router
 from app.api.challenges import router as challenges_router
 from app.api.judges import router as judges_router
 from app.api.leaderboard import router as leaderboard_router
+from app.api.mvps import router as mvps_router
 from app.api.runs import router as runs_router
 from app.api.scoring import router as scoring_router
 from app.config import Settings, load_settings
@@ -49,6 +50,7 @@ app.include_router(runs_router)
 app.include_router(scoring_router)
 app.include_router(artifacts_router)
 app.include_router(leaderboard_router)
+app.include_router(mvps_router)
 
 
 @app.get("/", tags=["infra"])
