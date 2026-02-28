@@ -23,6 +23,7 @@ class ChallengeCreateRequest(BaseModel):
     minimum_quality_threshold: float = Field(ge=0.0, le=1.0)
     risk_appetite: Literal["conservative", "balanced", "aggressive"]
     complexity_slider: float = Field(ge=0.0, le=1.0)
+    artifact_ttl_override_seconds: int | None = Field(default=None, gt=0, le=31_536_000)
 
 
 class ChallengeResponse(BaseModel):
@@ -33,6 +34,7 @@ class ChallengeResponse(BaseModel):
     minimum_quality_threshold: float
     risk_appetite: str
     complexity_slider: float
+    artifact_ttl_override_seconds: int | None
     created_at: datetime
     updated_at: datetime
 
@@ -44,6 +46,7 @@ class ChallengeUpdateRequest(BaseModel):
     minimum_quality_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
     risk_appetite: Literal["conservative", "balanced", "aggressive"] | None = None
     complexity_slider: float | None = Field(default=None, ge=0.0, le=1.0)
+    artifact_ttl_override_seconds: int | None = Field(default=None, gt=0, le=31_536_000)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ChallengeResponse)
@@ -59,6 +62,7 @@ async def create_challenge(
         minimum_quality_threshold=payload.minimum_quality_threshold,
         risk_appetite=payload.risk_appetite,
         complexity_slider=payload.complexity_slider,
+        artifact_ttl_override_seconds=payload.artifact_ttl_override_seconds,
     )
     session.add(challenge)
     await session.commit()

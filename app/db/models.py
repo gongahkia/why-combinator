@@ -20,6 +20,7 @@ class Challenge(TimestampMixin, Base):
     minimum_quality_threshold: Mapped[float] = mapped_column(Float, nullable=False)
     risk_appetite: Mapped[str] = mapped_column(String(32), nullable=False)
     complexity_slider: Mapped[float] = mapped_column(Float, nullable=False)
+    artifact_ttl_override_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     runs: Mapped[list[Run]] = relationship(back_populates="challenge", cascade="all, delete-orphan")
     judge_profiles: Mapped[list[JudgeProfile]] = relationship(back_populates="challenge", cascade="all, delete-orphan")
@@ -125,6 +126,7 @@ class Artifact(TimestampMixin, Base):
     artifact_type: Mapped[ArtifactType] = mapped_column(Enum(ArtifactType, name="artifact_type"), nullable=False, index=True)
     storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
     content_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     submission: Mapped[Submission] = relationship(back_populates="artifacts")
 

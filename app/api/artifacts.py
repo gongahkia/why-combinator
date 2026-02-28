@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.db.enums import ArtifactType
-from app.db.models import Artifact, Submission
+from app.db.models import Artifact, Challenge, Run, Submission
+from app.artifacts.retention import ArtifactRetentionPolicyError, compute_artifact_expiry
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
@@ -63,6 +64,8 @@ async def upload_artifact(
     submission = await session.get(Submission, submission_id)
     if submission is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submission not found")
+    run = await session.get(Run, submission.run_id)
+    challenge = await session.get(Challenge, run.challenge_id) if run is not None else None
 
     normalized_type = ARTIFACT_TYPE_ALIASES.get(artifact_type.strip().lower())
     if normalized_type is None:
@@ -109,11 +112,20 @@ async def upload_artifact(
     adapter = LocalObjectStorageAdapter(request.app.state.settings.artifact_storage_path)
     storage_key = adapter.put_object(submission_id, file.filename or "artifact.bin", content)
     content_hash = hashlib.sha256(content).hexdigest()
+    challenge_ttl_override = challenge.artifact_ttl_override_seconds if challenge is not None else None
+    try:
+        expires_at = compute_artifact_expiry(
+            created_at=datetime.now(timezone.utc),
+            challenge_override_seconds=challenge_ttl_override,
+        )
+    except ArtifactRetentionPolicyError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     artifact = Artifact(
         submission_id=submission_id,
         artifact_type=normalized_type,
         storage_key=storage_key,
         content_hash=content_hash,
+        expires_at=expires_at,
     )
     session.add(artifact)
     await session.commit()

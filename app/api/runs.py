@@ -101,6 +101,7 @@ async def start_run(
             "minimum_quality_threshold": challenge.minimum_quality_threshold,
             "risk_appetite": challenge.risk_appetite,
             "complexity_slider": challenge.complexity_slider,
+            "artifact_ttl_override_seconds": challenge.artifact_ttl_override_seconds,
         },
         "judge_profiles": [
             {

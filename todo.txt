@@ -1,4 +1,3 @@
-(B) Implement artifact retention policy engine with per-challenge TTL overrides +artifacts +storage
 (B) Implement storage adapter abstraction supporting local filesystem and S3-compatible backends +storage +artifacts
 (B) Implement presigned URL generation for artifact downloads with short expiry and scope constraints +api +artifacts
 (B) Implement per-user quota tracking for challenges, runs, and artifact storage usage +auth +quotas
