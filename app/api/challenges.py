@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
+from app.api.rate_limit import rate_limit_dependency
 from app.db.models import Challenge
 
 router = APIRouter(prefix="/challenges", tags=["challenges"])
@@ -36,7 +37,11 @@ class ChallengeResponse(BaseModel):
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=ChallengeResponse)
-async def create_challenge(payload: ChallengeCreateRequest, session: AsyncSession = Depends(get_db_session)) -> ChallengeResponse:
+async def create_challenge(
+    payload: ChallengeCreateRequest,
+    _rate_limit: None = rate_limit_dependency("challenge-mutation", capacity=30, refill_per_second=0.5),
+    session: AsyncSession = Depends(get_db_session),
+) -> ChallengeResponse:
     challenge = Challenge(
         title=payload.title,
         prompt=payload.prompt,

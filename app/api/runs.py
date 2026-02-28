@@ -10,6 +10,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
+from app.api.rate_limit import rate_limit_dependency
 from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
 from app.events.bus import emit_run_event, make_run_lifecycle_event
@@ -46,6 +47,7 @@ class RunCancelResponse(BaseModel):
 async def start_run(
     challenge_id: uuid.UUID,
     request: Request,
+    _rate_limit: None = rate_limit_dependency("run-control", capacity=20, refill_per_second=0.5),
     session: AsyncSession = Depends(get_db_session),
 ) -> RunResponse:
     challenge = await session.get(Challenge, challenge_id)
@@ -145,6 +147,7 @@ def _revoke_run_tasks(run_id: uuid.UUID) -> list[str]:
 async def cancel_run(
     challenge_id: uuid.UUID,
     run_id: uuid.UUID,
+    _rate_limit: None = rate_limit_dependency("run-control", capacity=20, refill_per_second=0.5),
     session: AsyncSession = Depends(get_db_session),
 ) -> RunCancelResponse:
     run = await session.get(Run, run_id)
