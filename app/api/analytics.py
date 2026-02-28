@@ -1,17 +1,28 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections import defaultdict
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import Select, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db_session
+from app.config import load_settings
 from app.db.enums import SubmissionState
-from app.db.models import Agent, JudgeProfile, JudgeScore, PenaltyEvent, Run, Submission
+from app.db.models import Agent, Challenge, JudgeProfile, JudgeScore, PenaltyEvent, Run, Submission
+from app.integrations.why_combinator_bridge import (
+    WhyCombinatorSimulationRequest,
+    WhyCombinatorSimulationResult,
+    WhyCombinatorUnavailableError,
+    infer_startup_industry,
+    map_challenge_to_why_parameters,
+    run_why_combinator_market_simulation,
+)
 from app.scoring.replay import (
     ReplayNotFoundError,
     ReplayValidationError,
@@ -72,6 +83,29 @@ class ReplayDiffResponse(BaseModel):
     run_id: uuid.UUID
     checkpoint_id: str
     submissions: list[ReplayDiffSubmissionMetrics]
+
+
+class MarketSimulationRequest(BaseModel):
+    industry: str | None = Field(default=None, min_length=2, max_length=64)
+    stage: Literal["idea", "mvp", "launch", "growth", "scale", "exit"] = "mvp"
+    duration_ticks: int = Field(default=60, ge=10, le=600)
+    model: str = Field(default="mock", min_length=2, max_length=64)
+    speed_multiplier: float = Field(default=250.0, gt=0.0, le=5000.0)
+    persist_simulation: bool = False
+
+
+class MarketSimulationResponse(BaseModel):
+    run_id: uuid.UUID
+    simulation_id: str
+    industry: str
+    stage: str
+    seed: int | None
+    integration_mode: str
+    overlap_highlights: list[str]
+    latest_metrics: dict[str, float]
+    recommendation: str
+    strengths: list[str]
+    weaknesses: list[str]
 
 
 @router.get("/{run_id}/analytics/agents/productivity", response_model=AgentProductivityResponse)
@@ -243,3 +277,105 @@ async def get_replay_diff_metrics(
             for row in diffs
         ],
     )
+
+
+@router.post("/{run_id}/analytics/market-simulation", response_model=MarketSimulationResponse)
+async def get_market_simulation_metrics(
+    run_id: uuid.UUID,
+    payload: MarketSimulationRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> MarketSimulationResponse:
+    run = await session.get(Run, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+
+    challenge = await session.get(Challenge, run.challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+
+    settings = load_settings()
+    industry = payload.industry.strip().lower() if payload.industry else infer_startup_industry(challenge.prompt)
+    seed = _extract_run_seed(run)
+    simulation_request = WhyCombinatorSimulationRequest(
+        simulation_name=f"{challenge.title} :: run {str(run.id)[:8]}",
+        industry=industry,
+        description=challenge.prompt,
+        stage=payload.stage,
+        duration_ticks=payload.duration_ticks,
+        model=payload.model,
+        speed_multiplier=payload.speed_multiplier,
+        seed=seed,
+        parameters=map_challenge_to_why_parameters(
+            complexity_slider=challenge.complexity_slider,
+            minimum_quality_threshold=challenge.minimum_quality_threshold,
+            risk_appetite=challenge.risk_appetite,
+            iteration_window_seconds=challenge.iteration_window_seconds,
+        ),
+        persist_simulation=payload.persist_simulation,
+        repo_path=settings.why_combinator_repo_path,
+        data_dir=settings.why_combinator_data_dir,
+    )
+
+    try:
+        simulation = await asyncio.to_thread(
+            run_why_combinator_market_simulation,
+            simulation_request,
+        )
+    except WhyCombinatorUnavailableError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    return _to_market_simulation_response(
+        run_id=run.id,
+        industry=industry,
+        stage=payload.stage,
+        seed=seed,
+        simulation=simulation,
+    )
+
+
+def _extract_run_seed(run: Run) -> int | None:
+    reproducibility = run.config_snapshot.get("reproducibility")
+    if not isinstance(reproducibility, dict):
+        return None
+    run_seed = reproducibility.get("run_seed")
+    if isinstance(run_seed, int):
+        return run_seed
+    return None
+
+
+def _to_market_simulation_response(
+    *,
+    run_id: uuid.UUID,
+    industry: str,
+    stage: str,
+    seed: int | None,
+    simulation: WhyCombinatorSimulationResult,
+) -> MarketSimulationResponse:
+    summary = simulation.summary
+    recommendation = summary.get("recommendation")
+    strengths = _coerce_string_list(summary.get("strengths"))
+    weaknesses = _coerce_string_list(summary.get("weaknesses"))
+
+    return MarketSimulationResponse(
+        run_id=run_id,
+        simulation_id=simulation.simulation_id,
+        industry=industry,
+        stage=stage,
+        seed=seed,
+        integration_mode="hackathon-runtime + why-combinator market simulation",
+        overlap_highlights=[
+            "Both systems use deterministic seeds for replay-safe experiments.",
+            "Both use multi-agent orchestration with phase/state progression.",
+            "Hackathon quality scoring is augmented with market and runway stress metrics.",
+        ],
+        latest_metrics=simulation.latest_metrics,
+        recommendation=recommendation if isinstance(recommendation, str) else "no recommendation",
+        strengths=strengths,
+        weaknesses=weaknesses,
+    )
+
+
+def _coerce_string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    return []
