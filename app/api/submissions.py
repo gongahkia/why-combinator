@@ -20,7 +20,7 @@ from app.db.enums import ArtifactType
 from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
-from app.storage.local import LocalObjectStorageAdapter
+from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 
 router = APIRouter(prefix="/runs", tags=["submissions"])
 
@@ -146,6 +146,13 @@ async def ingest_submission_transactional(
         artifact_ids: list[uuid.UUID] = []
         for artifact_input in payload.artifacts:
             content = base64.b64decode(artifact_input.content_base64)
+            try:
+                validate_archive_members_safe(content, artifact_input.filename)
+            except ArchiveExtractionError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"archive rejected by extraction guard: {exc}",
+                ) from exc
             try:
                 scan_artifact_or_raise(artifact_input.filename, content)
             except MalwareScanError as exc:

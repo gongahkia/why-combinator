@@ -1,8 +1,40 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import tarfile
 import uuid
-from pathlib import Path
+import zipfile
+from pathlib import Path, PurePosixPath
+
+
+class ArchiveExtractionError(ValueError):
+    pass
+
+
+def _ensure_safe_member_path(raw_name: str) -> None:
+    name = raw_name.replace("\\", "/")
+    path = PurePosixPath(name)
+    if path.is_absolute():
+        raise ArchiveExtractionError(f"archive member path is absolute: {raw_name}")
+    if any(part == ".." for part in path.parts):
+        raise ArchiveExtractionError(f"archive member path escapes target directory: {raw_name}")
+
+
+def validate_archive_members_safe(content: bytes, filename: str) -> None:
+    lowered = filename.lower()
+    if lowered.endswith(".zip"):
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            for member in archive.infolist():
+                _ensure_safe_member_path(member.filename)
+        return
+    if lowered.endswith(".tar") or lowered.endswith(".tar.gz") or lowered.endswith(".tgz"):
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:*") as archive:
+            for member in archive.getmembers():
+                _ensure_safe_member_path(member.name)
+                if member.issym() or member.islnk():
+                    _ensure_safe_member_path(member.linkname)
+        return
 
 
 class LocalObjectStorageAdapter:

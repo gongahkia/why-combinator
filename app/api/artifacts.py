@@ -14,7 +14,7 @@ from app.api.deps import get_db_session
 from app.db.enums import ArtifactType
 from app.db.models import Artifact, Submission
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
-from app.storage.local import LocalObjectStorageAdapter
+from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 
 router = APIRouter(prefix="/submissions", tags=["artifacts"])
 
@@ -72,6 +72,13 @@ async def upload_artifact(
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="artifact file is empty")
+    try:
+        validate_archive_members_safe(content, file.filename or "artifact.bin")
+    except ArchiveExtractionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"archive rejected by extraction guard: {exc}",
+        ) from exc
     try:
         scan_artifact_or_raise(file.filename or "artifact.bin", content)
     except MalwareScanError as exc:
