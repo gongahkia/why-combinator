@@ -1,4 +1,3 @@
-(B) Implement integration test for budget ledger consistency under concurrent subagent spawn attempts +tests +budget
 (B) Implement chaos test injecting worker crashes during checkpoint scoring and validating recovery semantics +tests +reliability
 (B) Set up Remotion demo video workspace with a 120-second master composition, reusable scene layout primitives, and project-level render config +demo +remotion
 (B) Create a full-use-case storyboard and timing script for a 2-minute demo covering challenge setup, run start, agent execution, judging, scoring, leaderboard, and artifact retrieval +demo +remotion
