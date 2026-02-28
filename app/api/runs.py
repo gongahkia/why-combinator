@@ -16,6 +16,7 @@ from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
 from app.events.bus import emit_run_event, make_run_lifecycle_event
 from app.orchestrator.baseline import run_baseline_idea_generator_job
+from app.orchestrator.admission import evaluate_run_admission_capacity
 from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incomplete
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 from app.queue.celery_app import celery_app
@@ -60,6 +61,16 @@ async def start_run(
     challenge = await session.get(Challenge, challenge_id)
     if challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+
+    admission = evaluate_run_admission_capacity(celery_app.control.inspect(timeout=1.0))
+    if not admission.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"{admission.reason}: active_tasks={admission.active_tasks}, "
+                f"threshold={admission.threshold}"
+            ),
+        )
 
     await seed_default_judge_panel_if_incomplete(session, challenge_id, challenge.prompt)
     try:
