@@ -38,6 +38,9 @@ class Run(TimestampMixin, Base):
     agents: Mapped[list[Agent]] = relationship(back_populates="run", cascade="all, delete-orphan")
     edges: Mapped[list[SubagentEdge]] = relationship(back_populates="run", cascade="all, delete-orphan")
     submissions: Mapped[list[Submission]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    scoring_weight_configs: Mapped[list[ScoringWeightConfig]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
 
 
 class Agent(TimestampMixin, Base):
@@ -124,3 +127,14 @@ class PenaltyEvent(TimestampMixin, Base):
     explanation: Mapped[str] = mapped_column(Text, nullable=False)
 
     submission: Mapped[Submission] = relationship(back_populates="penalty_events")
+
+
+class ScoringWeightConfig(TimestampMixin, Base):
+    __tablename__ = "scoring_weight_configs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    effective_from: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    weights: Mapped[dict[str, float]] = mapped_column(JSON, nullable=False)
+
+    run: Mapped[Run] = relationship(back_populates="scoring_weight_configs")
