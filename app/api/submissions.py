@@ -26,6 +26,7 @@ from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.queue.jobs import enqueue_submission_score_job
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
+from app.security.quarantine import quarantine_rejected_artifact
 from app.storage.adapter import build_object_storage_adapter
 from app.storage.local import ArchiveExtractionError, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
@@ -195,6 +196,13 @@ async def ingest_submission_transactional(
             try:
                 scan_artifact_or_raise(artifact_input.filename, content)
             except MalwareScanError as exc:
+                quarantine_rejected_artifact(
+                    request.app.state.settings.artifact_storage_path,
+                    submission_id=submission.id,
+                    filename=artifact_input.filename,
+                    content=content,
+                    reason=f"{exc.engine}:{exc.reason}",
+                )
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"artifact blocked by malware scanner ({exc.engine}): {exc.reason}",

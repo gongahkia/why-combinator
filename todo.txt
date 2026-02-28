@@ -1,4 +1,3 @@
-(B) Implement integration test for malware scan rejection path and safe artifact quarantine behavior +tests +security
 (B) Implement integration test for submission and run state machine illegal transition rejection +tests +validation
 (B) Implement integration test for paginated leaderboard cursor stability under concurrent scoring writes +tests +leaderboard
 (B) Implement integration test for URL ingestion guard blocking localhost and private network redirect chains +tests +ingest

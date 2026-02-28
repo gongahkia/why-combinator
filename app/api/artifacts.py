@@ -17,6 +17,7 @@ from app.artifacts.retention import ArtifactRetentionPolicyError, compute_artifa
 from app.artifacts.retention import is_artifact_expired
 from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, quota_limits_from_request, resolve_quota_user_id
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
+from app.security.quarantine import quarantine_rejected_artifact
 from app.storage.adapter import ObjectStorageAdapter, build_object_storage_adapter
 from app.storage.local import ArchiveExtractionError, validate_archive_members_safe
 from app.storage.presign import ArtifactPresignError, create_artifact_download_token, validate_artifact_download_token
@@ -119,6 +120,13 @@ async def upload_artifact(
     try:
         scan_artifact_or_raise(file.filename or "artifact.bin", content)
     except MalwareScanError as exc:
+        quarantine_rejected_artifact(
+            request.app.state.settings.artifact_storage_path,
+            submission_id=submission_id,
+            filename=file.filename or "artifact.bin",
+            content=content,
+            reason=f"{exc.engine}:{exc.reason}",
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"artifact blocked by malware scanner ({exc.engine}): {exc.reason}",
