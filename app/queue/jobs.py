@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 import time
@@ -7,9 +8,18 @@ import uuid
 from typing import Any
 
 from celery import shared_task, signals
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 
+from app.config import load_settings
 from app.observability.trace import ensure_trace_id
+from app.observability.trace import new_trace_id
 from app.orchestrator.jobs import run_checkpoint_score_job, run_complete_run_job, run_hacker_job, run_judge_job
+from app.queue.checkpoint_backfill import (
+    clear_failed_checkpoint_backfill,
+    list_failed_checkpoint_backfills,
+    record_failed_checkpoint_backfill,
+)
 from app.queue.budget import create_redis_client, reserve_budget, task_cost_from_env
 from app.queue.dead_letter import persist_dead_letter_event
 from app.queue.dedup import claim_score_job_dedup_key
@@ -216,6 +226,67 @@ def _checkpoint_run_lock_key(run_id: str) -> str:
     return f"lock:checkpoint-score:{run_id}"
 
 
+def load_checkpoint_backfill_max_enqueues() -> int:
+    return int(os.getenv("CHECKPOINT_BACKFILL_MAX_ENQUEUES", "25"))
+
+
+def load_checkpoint_backfill_retry_delay_seconds() -> int:
+    return int(os.getenv("CHECKPOINT_BACKFILL_RETRY_DELAY_SECONDS", "60"))
+
+
+def _is_temporary_dependency_failure(exc: Exception) -> bool:
+    text_value = f"{exc.__class__.__name__}:{exc}".lower()
+    dependency_failure_tokens = (
+        "connection refused",
+        "connection reset",
+        "temporarily unavailable",
+        "timeout",
+        "timed out",
+        "could not connect",
+        "failed to connect",
+        "server closed the connection",
+        "name or service not known",
+        "temporary failure in name resolution",
+        "database is locked",
+        "redis",
+        "postgres",
+        "asyncpg",
+    )
+    return any(token in text_value for token in dependency_failure_tokens)
+
+
+async def _probe_database_connectivity(database_url: str) -> bool:
+    engine = create_async_engine(database_url, pool_pre_ping=True)
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        await engine.dispose()
+
+
+def _dependencies_recovered_for_checkpoint_backfill() -> bool:
+    redis_client = create_redis_client()
+    try:
+        redis_client.ping()
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        redis_client.close()
+
+    settings = load_settings()
+    try:
+        return asyncio.run(_probe_database_connectivity(settings.database_url))
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(_probe_database_connectivity(settings.database_url))
+        finally:
+            loop.close()
+
+
 @shared_task(name="app.queue.jobs.hacker_run", bind=True)
 def hacker_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
@@ -280,15 +351,10 @@ def judge_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
         raise self.retry(exc=exc, countdown=2**self.request.retries, max_retries=max_retries)
 
 
-@shared_task(
-    name="app.queue.jobs.checkpoint_score",
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_kwargs={"max_retries": 3},
-)
+@shared_task(name="app.queue.jobs.checkpoint_score", bind=True)
 def checkpoint_score(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
+    max_retries = 3
     accepted, payload = _with_budget_guard(run_id, "checkpoint-score", default_cost=2)
     if not accepted:
         return {**payload, "trace_id": effective_trace_id}
@@ -304,8 +370,92 @@ def checkpoint_score(self, run_id: str, trace_id: str | None = None) -> dict[str
         }
     try:
         return run_checkpoint_score_job(run_id, trace_id=effective_trace_id)
+    except Exception as exc:  # noqa: BLE001
+        if _is_temporary_dependency_failure(exc):
+            record_failed_checkpoint_backfill(
+                redis_client,
+                run_id=run_id,
+                trace_id=effective_trace_id,
+                reason=str(exc),
+            )
+            backfill_failed_checkpoints.apply_async(
+                kwargs={"trace_id": new_trace_id()},
+                countdown=max(1, load_checkpoint_backfill_retry_delay_seconds()),
+            )
+            return {
+                "job_type": "checkpoint-score",
+                "run_id": run_id,
+                "status": "dependency_failed_backfill_queued",
+                "reason": str(exc),
+                "trace_id": effective_trace_id,
+            }
+        if self.request.retries >= max_retries:
+            persist_dead_letter_event("checkpoint-score", run_id, str(exc), self.request.retries)
+            return {
+                "job_type": "checkpoint-score",
+                "run_id": run_id,
+                "status": "dead_lettered",
+                "reason": str(exc),
+                "trace_id": effective_trace_id,
+            }
+        raise self.retry(exc=exc, countdown=2**self.request.retries, max_retries=max_retries)
     finally:
         lock.release()
+        redis_client.close()
+
+
+@shared_task(
+    name="app.queue.jobs.backfill_failed_checkpoints",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def backfill_failed_checkpoints(self, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
+    redis_client = create_redis_client()
+    try:
+        pending_backfills = list_failed_checkpoint_backfills(redis_client)
+        if not pending_backfills:
+            return {
+                "job_type": "checkpoint-backfill",
+                "status": "completed",
+                "enqueued": "0",
+                "remaining": "0",
+                "trace_id": effective_trace_id,
+            }
+
+        if not _dependencies_recovered_for_checkpoint_backfill():
+            backfill_failed_checkpoints.apply_async(
+                kwargs={"trace_id": new_trace_id()},
+                countdown=max(1, load_checkpoint_backfill_retry_delay_seconds()),
+            )
+            return {
+                "job_type": "checkpoint-backfill",
+                "status": "dependencies_unhealthy",
+                "enqueued": "0",
+                "remaining": str(len(pending_backfills)),
+                "trace_id": effective_trace_id,
+            }
+
+        max_enqueues = max(1, load_checkpoint_backfill_max_enqueues())
+        enqueued = 0
+        for payload in pending_backfills[:max_enqueues]:
+            run_id = str(payload.get("run_id", "")).strip()
+            if not run_id:
+                continue
+            checkpoint_score.delay(run_id, new_trace_id())
+            clear_failed_checkpoint_backfill(redis_client, run_id)
+            enqueued += 1
+
+        return {
+            "job_type": "checkpoint-backfill",
+            "status": "completed",
+            "enqueued": str(enqueued),
+            "remaining": str(max(0, len(pending_backfills) - enqueued)),
+            "trace_id": effective_trace_id,
+        }
+    finally:
         redis_client.close()
 
 

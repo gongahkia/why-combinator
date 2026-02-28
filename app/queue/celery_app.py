@@ -24,6 +24,7 @@ celery_app.conf.update(
         "app.queue.jobs.hacker_run": {"queue": "hacker-run"},
         "app.queue.jobs.judge_run": {"queue": "judge-run"},
         "app.queue.jobs.checkpoint_score": {"queue": "checkpoint-score"},
+        "app.queue.jobs.backfill_failed_checkpoints": {"queue": "checkpoint-backfill"},
         "app.queue.jobs.complete_run": {"queue": "run-complete"},
         "app.queue.jobs.score_submission": {"queue": "score-submission"},
         "app.queue.jobs.recover_orphaned_tasks": {"queue": "recovery"},

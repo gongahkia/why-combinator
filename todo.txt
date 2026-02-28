@@ -1,4 +1,3 @@
-(A) Implement asynchronous scoring backfill job for temporarily failed checkpoints after dependency recovery +scoring +reliability
 (A) Implement scoreboard cache in Redis with write-through invalidation on score and penalty event insert +leaderboard +cache
 (A) Implement paginated leaderboard API with stable cursor ordering under concurrent score updates +api +leaderboard
 (A) Implement partial run resume workflow to restart from last completed checkpoint after orchestrator crash +run +reliability
