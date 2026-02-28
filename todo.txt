@@ -1,0 +1,181 @@
+(A) Implement FastAPI service bootstrap with lifespan hooks for Postgres and Redis connection pools +api +infra
+(A) Implement Redis-backed task queue workers for hacker-run, judge-run, and checkpoint-score jobs using Celery +queue +orchestrator
+(A) Implement SQLAlchemy models for Challenge, Run, Agent, SubagentEdge, Submission, Artifact, ScoreEvent, and PenaltyEvent +db
+(A) Implement Alembic migration creating normalized tables with foreign keys, unique constraints, and created_at/updated_at indexes +db
+(A) Implement Postgres enum types for run_state, agent_role, submission_state, and artifact_type +db
+(A) Implement API endpoint to create challenge with iteration window, quality threshold, risk appetite, and slider value validation +api +challenge
+(A) Implement API endpoint to update scoring weights mid-run and persist effective_from timestamp for forward-only application +api +scoring
+(A) Implement API endpoint to register judge profiles from inline JSON payload +api +judging
+(A) Implement API endpoint to register judge profiles from YAML payload parsed into canonical schema +api +judging
+(A) Implement API endpoint to register judge profiles from CSV payload mapped to canonical schema +api +judging
+(A) Implement API endpoint to register judge profile from URL by fetching via curl subprocess with timeout and size limit +api +ingest
+(A) Implement URL ingestion sanitizer that only allows http/https schemes and blocks localhost/private CIDR targets +security +ingest
+(A) Implement parser pipeline to auto-detect fetched profile content type and normalize to judge profile schema +ingest +judging
+(A) Implement validation rule requiring at least one domain_expert judge per challenge before run start +judging +validation
+(A) Implement API endpoint to start run that freezes initial config snapshot and emits run_started event +api +run
+(A) Implement baseline idea generator job at run start using Codex agent prompt template and store baseline vectors +orchestrator +novelty
+(A) Implement HackerAgent runner that executes each agent in isolated Docker container with cpu/memory/time limits +sandbox +agents
+(A) Implement per-run compute budget ledger in Redis and deny new tasks when budget is exhausted +budget +queue
+(A) Implement per-agent compute quota checks before spawning subagents +budget +agents
+(A) Implement configurable subagent spawn policy with defaults for max depth and max children +agents +orchestrator
+(A) Implement subagent DAG persistence with parent-child edge records and cycle prevention validation +db +agents
+(A) Implement artifact upload API storing metadata in Postgres and binary blobs in local object storage adapter +api +artifacts
+(A) Implement artifact type validation supporting web app bundle, CLI package, API service bundle, and notebook file +artifacts +validation
+(A) Implement mandatory submission validator enforcing runnable artifact, short README artifact, and value hypothesis field +submissions +validation
+(A) Implement non-production penalty generator when agent produces zero valid submissions by run end +penalties +scoring
+(A) Implement similarity scorer using embedding cosine similarity across submission summaries and artifact fingerprints +novelty +scoring
+(A) Implement artifact overlap detector using file hash shingles and dependency manifest overlap metrics +novelty +scoring
+(A) Implement too-safe penalty scorer comparing submission embeddings against baseline idea embeddings +penalties +novelty
+(A) Implement periodic checkpoint scheduler that enqueues scoring jobs at fixed interval until run end +scheduler +scoring
+(A) Implement judge scoring worker that requests Codex evaluation using challenge criteria and judge domain prompts +judging +agents
+(A) Implement scoring aggregation engine supporting average, weighted panel, and head-judge override modes +scoring
+(A) Implement threshold gate that marks submission accepted only when quality score >= minimum_quality_threshold +scoring +validation
+(A) Implement final score composer combining quality, novelty, feasibility, criteria, and penalties with active weights snapshot +scoring
+(A) Implement forward-only weight application logic selecting latest config with effective_from <= score timestamp +scoring +config
+(A) Implement leaderboard materializer that ranks accepted MVPs by final score and stores deterministic tie-break metadata +leaderboard +scoring
+(A) Implement run completion worker that finalizes pending submissions, applies non-production penalties, and seals run state +run +orchestrator
+(A) Implement API endpoint returning leaderboard with score breakdown, active penalties, and judge rationale snippets +api +leaderboard
+(A) Implement API endpoint returning all MVP bundles and artifact download links for accepted submissions +api +artifacts
+(A) Implement API endpoint returning run timeline events including spawn, submit, score, and weight-change checkpoints +api +run
+(A) Implement human-testing-required flag on submissions when runtime validation fails or is skipped by executor +validation +submissions
+(A) Implement runtime validator subagent workflow for CLI artifacts that executes declared command and captures exit code +validation +agents
+(A) Implement runtime validator subagent workflow for API artifacts that boots service and probes health endpoint +validation +agents
+(A) Implement runtime validator subagent workflow for web artifacts that serves build and checks HTTP 200 and console errors +validation +agents
+(A) Implement runtime validator subagent workflow for notebooks that runs papermill and captures cell execution failures +validation +agents
+(A) Implement sandbox image builder for runner containers with restricted network egress and whitelisted package mirrors +sandbox +security
+(A) Implement sandbox filesystem mount policy with read-only base image and writable ephemeral workdir +sandbox +security
+(A) Implement secrets injection for model API keys via short-lived env vars scoped to job execution +security +agents
+(A) Implement model client wrapper for Codex agent calls with retries, exponential backoff, and structured error typing +agents +integrations
+(A) Implement prompt templating engine for Hacker Agents using challenge, criteria, risk appetite, and slider inputs +agents +prompting
+(A) Implement prompt templating engine for Judge Agents using domain profile, scoring rubric, and penalty policy +judging +prompting
+(A) Implement risk appetite policy mapper translating conservative/balanced/aggressive into exploration constraints +orchestrator +policy
+(A) Implement idea complexity slider mapper converting value into target count, depth, and time-allocation strategy +orchestrator +policy
+(A) Implement adaptive planner that reallocates remaining budget between new ideas and refinement each checkpoint +orchestrator +budget
+(A) Implement queue deduplication keys preventing duplicate score jobs for same submission and checkpoint +queue +scoring
+(A) Implement idempotency keys for submission create API and scoring event writes +api +db
+(A) Implement optimistic locking on mutable run config rows to prevent concurrent weight update conflicts +db +api
+(A) Implement Redis distributed locks around checkpoint scoring batches per run +queue +scoring
+(A) Implement dead-letter queue handling for failed agent tasks with capped retries and failure reason persistence +queue +reliability
+(A) Implement cancellation endpoint that stops active containers, revokes queued jobs, and marks run canceled +api +run
+(A) Implement run timeout watchdog that force-finalizes run at iteration window boundary +scheduler +run
+(A) Implement judge profile schema validator enforcing domain, scoring style, and optional head_judge flag constraints +judging +validation
+(A) Implement head judge uniqueness rule allowing at most one head_judge per panel +judging +validation
+(A) Implement criteria weight validator enforcing non-negative weights and normalized sum to 1.0 +scoring +validation
+(A) Implement penalty weight validator for similarity and too-safe penalties with bounded ranges +scoring +validation
+(A) Implement feasibility scorer extracting build/run signal from runtime validator outputs and dependency resolution logs +scoring +validation
+(A) Implement quality scorer rubric that maps judge outputs into normalized numeric scale +scoring +judging
+(A) Implement novelty score normalization to avoid penalizing near-duplicates beyond configured floor +novelty +scoring
+(A) Implement run-level diversity index computation from accepted MVP embedding cluster dispersion +analytics +novelty
+(A) Implement metric emitter for accepted MVP count, median time to first accepted MVP, diversity index, and producer share +analytics +metrics
+(A) Implement structured event bus payloads for run lifecycle and scoring lifecycle events +events +orchestrator
+(A) Implement API auth middleware for organizer and participant roles with challenge-level authorization checks +auth +api
+(A) Implement per-challenge API keys with hashed storage and rolling key rotation endpoint +auth +security
+(A) Implement rate limiting on challenge mutation and run control endpoints using Redis token buckets +security +api
+(A) Implement Pydantic request/response schemas for all challenge, run, scoring, and artifact endpoints +api +validation
+(A) Implement OpenAPI error model mapping for validation, budget_exhausted, sandbox_failure, and scoring_unavailable codes +api
+(A) Implement transactional submission ingestion that atomically writes submission, artifacts, and initial status +db +submissions
+(A) Implement score event append-only table writes with immutable payload checksum +db +scoring
+(A) Implement penalty event append-only table writes with source explanation and checkpoint id +db +penalties
+(A) Implement checkpoint snapshot table to record active weights and policies at each scoring interval +db +scoring
+(A) Implement query layer to reconstruct effective config timeline for audit-safe forward-only scoring +db +scoring
+(A) Implement automatic challenge state guard preventing edits to immutable fields after run start +challenge +validation
+(A) Implement enforcement that every Hacker Agent submits at least one attempt object before run close +agents +submissions
+(A) Implement heavy penalty multiplier config for agents with zero valid MVP submissions +penalties +scoring
+(A) Implement run bootstrap seeding of default judge panel domains when user panel is incomplete +judging +orchestrator
+(A) Implement compliance-domain auto-suggestion when prompt matches regulated keywords and user has no compliance judge +judging +policy
+(A) Implement safe curl fetch wrapper with connect/read timeout, max redirects, and content-length cap +ingest +security
+(A) Implement URL fetch content hashing and cache keying in Redis to avoid repeated profile downloads +ingest +cache
+(A) Implement malformed profile rejection path with precise parser error payloads +ingest +api
+(A) Implement local artifact fingerprinting worker generating language, framework, and dependency signatures +artifacts +novelty
+(A) Implement semantic summary generator for each submission using Codex with deterministic temperature settings +agents +summarization
+(A) Implement checkpoint scorer to skip submissions already scored under unchanged effective config +scoring +performance
+(A) Implement submission rescore trigger when forward config changes become active at next checkpoint +scoring +config
+(A) Implement stable deterministic tie-breaker using earlier accepted_at then lower total penalty then submission id +leaderboard +scoring
+(A) Implement run export endpoint streaming JSON bundle of submissions, scores, penalties, and leaderboard +api +export
+(A) Implement health endpoint checking Postgres, Redis, queue worker heartbeat, and sandbox runner availability +api +infra
+(A) Implement readiness endpoint verifying migration version and model provider credential presence +api +infra
+(A) Implement graceful shutdown logic draining workers and marking in-flight tasks recoverable +queue +reliability
+(A) Implement recovery job that requeues orphaned in-flight tasks after worker crash detection +queue +reliability
+(A) Implement secure container log capture with size limits and per-task retention policies +sandbox +observability
+(A) Implement execution trace IDs propagated across API, queue, sandbox, and scoring events +observability +infra
+(A) Implement seed script to create local default challenge templates for rapid hackathon run initialization +challenge +api
+(A) Add integration test for forward-only scoring updates proving no retroactive rescore before next checkpoint +tests +scoring
+(A) Add integration test for similarity and too-safe penalty composition against controlled baseline ideas +tests +scoring
+(A) Add integration test for non-production penalty assignment when agent submits no valid MVP +tests +penalties
+(A) Add integration test for mandatory artifact/readme/value-hypothesis validator rejecting incomplete submissions +tests +validation
+(A) Add integration test for judge profile URL ingestion via curl wrapper with blocked private network targets +tests +ingest
+(A) Add integration test for subagent spawn limits enforcing max depth and max children policies +tests +agents
+(A) Add integration test for budget exhaustion preventing new tasks while allowing scoring finalization tasks +tests +budget
+(A) Add integration test for run timeout watchdog finalizing exactly at iteration deadline +tests +run
+(A) Add integration test for runtime validators covering CLI, API, web, and notebook artifact classes +tests +validation
+(A) Add integration test for leaderboard determinism with equal scores and tie-break conditions +tests +leaderboard
+(A) Add load test script simulating concurrent runs with periodic checkpoint scoring and Redis lock contention +tests +performance
+(A) Add end-to-end test covering challenge create, run start, agent execution, checkpoint scoring, and final leaderboard retrieval +tests +e2e
+(A) Implement run admission control that rejects new runs when worker capacity watermark is exceeded +orchestrator +capacity
+(A) Implement per-run concurrency limiter for simultaneous active hacker containers +sandbox +capacity
+(A) Implement weighted fair scheduler across challenges to prevent single challenge starvation of queue resources +scheduler +queue
+(A) Implement container startup timeout guard that marks task failed when runtime boot exceeds configured threshold +sandbox +reliability
+(A) Implement sandbox network policy to block metadata endpoints and cloud instance identity IP ranges +sandbox +security
+(A) Implement artifact malware scan hook using pluggable scanner interface before artifact acceptance +security +artifacts
+(A) Implement archive extraction guard preventing zip-slip path traversal on uploaded artifacts +security +artifacts
+(A) Implement max artifact count and max total artifact size validation per submission +validation +artifacts
+(A) Implement duplicate artifact detection by content hash and soft-link reuse in storage layer +artifacts +storage
+(A) Implement challenge prompt safety filter that rejects disallowed execution intents before run creation +security +challenge
+(A) Implement strict JSON schema validation for model responses from hacker and judge agents +agents +validation
+(A) Implement judge response repair pipeline that retries malformed structured outputs with constrained re-prompt +judging +agents
+(A) Implement fallback judge execution path when one judge agent fails to return score within checkpoint SLA +judging +reliability
+(A) Implement confidence score extraction from judge outputs and incorporate into weighted aggregation +judging +scoring
+(A) Implement anti-gaming detector for template-cloned submissions with shallow textual mutations +novelty +penalties
+(A) Implement prompt-injection detector on ingested judge profiles and challenge URLs prior to parsing +security +ingest
+(A) Implement URL content fetch allowlist override setting scoped per challenge for controlled external ingestion +ingest +security
+(A) Implement isolated git checkout worker for repository-based artifacts with commit pinning and shallow clone +artifacts +sandbox
+(A) Implement API endpoint to attach external repository URL as submission source and trigger ingestion pipeline +api +artifacts
+(A) Implement runtime validator for repository artifacts that auto-detects project type and executes safe test command +validation +agents
+(A) Implement asynchronous scoring backfill job for temporarily failed checkpoints after dependency recovery +scoring +reliability
+(A) Implement scoreboard cache in Redis with write-through invalidation on score and penalty event insert +leaderboard +cache
+(A) Implement paginated leaderboard API with stable cursor ordering under concurrent score updates +api +leaderboard
+(A) Implement partial run resume workflow to restart from last completed checkpoint after orchestrator crash +run +reliability
+(A) Implement checkpoint transactional boundary ensuring score and penalty writes commit atomically per submission +db +scoring
+(A) Implement outbox table and relay worker for exactly-once event publication to internal event bus +events +reliability
+(A) Implement scheduler heartbeat monitor that triggers leader election failover for checkpoint dispatch +scheduler +reliability
+(A) Implement Redis-based leader election lock for singleton scheduler duties +scheduler +queue
+(A) Implement policy engine for risk appetite that adjusts novelty penalty sensitivity thresholds dynamically +policy +scoring
+(A) Implement policy engine for complexity slider that scales expected artifact sophistication rubric +policy +scoring
+(A) Implement minimum viable README validator enforcing bounded length and required sections via parser +validation +submissions
+(A) Implement value hypothesis validator enforcing measurable outcome statement pattern checks +validation +submissions
+(A) Implement submission state machine with legal transitions and rejection of invalid transition requests +submissions +validation
+(A) Implement run state machine with legal transitions for created, running, canceling, completed, canceled, failed +run +validation
+(A) Implement automatic stale run failure transition when no worker heartbeat updates within configured interval +run +reliability
+(A) Implement API endpoint to retrieve per-agent productivity metrics including attempts, accepted MVPs, and penalties +api +analytics
+(A) Implement API endpoint to retrieve per-judge disagreement metrics and inter-judge variance per checkpoint +api +analytics
+(A) Implement inter-judge variance penalty dampener preventing outlier judge from dominating final score +scoring +judging
+(A) Implement configurable score component caps and floors to prevent runaway penalty dominance +scoring +validation
+(A) Implement deterministic random seed propagation across agent prompts for reproducible replay mode +agents +reproducibility
+(A) Implement replay endpoint that reruns scoring-only pipeline against frozen submissions and config snapshots +api +scoring
+(A) Implement replay diff generator showing score deltas between original and replay runs +scoring +analytics
+(B) Implement optional websocket stream for periodic checkpoint updates and leaderboard deltas +api +realtime
+(B) Implement SSE fallback endpoint for checkpoint progress when websocket transport is unavailable +api +realtime
+(B) Implement typed client SDK generation step from OpenAPI schema and publishable package output +api +sdk
+(B) Implement background cleanup worker deleting expired sandbox volumes and temporary workdirs +sandbox +maintenance
+(B) Implement artifact retention policy engine with per-challenge TTL overrides +artifacts +storage
+(B) Implement storage adapter abstraction supporting local filesystem and S3-compatible backends +storage +artifacts
+(B) Implement presigned URL generation for artifact downloads with short expiry and scope constraints +api +artifacts
+(B) Implement per-user quota tracking for challenges, runs, and artifact storage usage +auth +quotas
+(B) Implement quota enforcement middleware returning structured over-quota errors +auth +quotas
+(B) Implement challenge template cloning endpoint to duplicate config and judge panel into new draft challenge +api +challenge
+(B) Implement bulk judge profile import endpoint accepting mixed JSON/YAML/CSV files in multipart payload +api +judging
+(B) Implement judge profile versioning table with active/inactive selection and optimistic locking +db +judging
+(B) Implement run segmentation labels to group results by team or track and filter leaderboard output +leaderboard +challenge
+(B) Implement advanced artifact fingerprinting for AST-level similarity on supported languages +novelty +artifacts
+(B) Implement configurable novelty strategy selector between embedding-only and hybrid overlap modes +novelty +config
+(B) Implement checkpoint jitter control to stagger large run scoring waves and reduce queue spikes +scheduler +performance
+(B) Implement adaptive checkpoint interval scaling based on queue depth and worker throughput +scheduler +performance
+(B) Implement integration test for scheduler failover ensuring exactly one active dispatcher at any time +tests +scheduler
+(B) Implement integration test for outbox relay guaranteeing no duplicate event publication on retries +tests +events
+(B) Implement integration test for run replay producing deterministic score output with fixed seed +tests +reproducibility
+(B) Implement integration test for malware scan rejection path and safe artifact quarantine behavior +tests +security
+(B) Implement integration test for submission and run state machine illegal transition rejection +tests +validation
+(B) Implement integration test for paginated leaderboard cursor stability under concurrent scoring writes +tests +leaderboard
+(B) Implement integration test for URL ingestion guard blocking localhost and private network redirect chains +tests +ingest
+(B) Implement integration test for budget ledger consistency under concurrent subagent spawn attempts +tests +budget
+(B) Implement chaos test injecting worker crashes during checkpoint scoring and validating recovery semantics +tests +reliability
