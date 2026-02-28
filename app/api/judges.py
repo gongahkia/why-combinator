@@ -18,6 +18,7 @@ from app.ingest.profile_parser import ProfileParseError, parse_profile_payload
 from app.ingest.sanitize import URLSanitizationError, sanitize_ingestion_url
 from app.ingest.url_cache import fetch_url_content_cached
 from app.ingest.url_fetch import URLFetchError
+from app.security.prompt_injection import PromptInjectionError, assert_no_prompt_injection
 
 router = APIRouter(prefix="/challenges", tags=["judging"])
 
@@ -217,6 +218,7 @@ async def register_judge_profile_url(
             timeout_seconds=payload.timeout_seconds,
             max_bytes=payload.max_bytes,
         )
+        assert_no_prompt_injection(content.decode("utf-8", errors="ignore"), source="judge_profile_url_content")
         source_format, parsed = parse_profile_payload(content)
     except URLSanitizationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url not allowed: {exc}") from exc
@@ -230,6 +232,11 @@ async def register_judge_profile_url(
                 "message": "unable to parse fetched profile",
                 "parser_error": exc.as_payload(),
             },
+        ) from exc
+    except PromptInjectionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"url content blocked: {exc}",
         ) from exc
 
     profiles = normalize_profiles(parsed)
