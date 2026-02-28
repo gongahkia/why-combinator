@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.db.models import Challenge, JudgeProfile
+from app.ingest.sanitize import URLSanitizationError, sanitize_ingestion_url
 from app.ingest.url_fetch import URLFetchError, fetch_url_content
 
 router = APIRouter(prefix="/challenges", tags=["judging"])
@@ -175,7 +176,10 @@ async def register_judge_profile_url(
     session: AsyncSession = Depends(get_db_session),
 ) -> list[JudgeProfileResponse]:
     try:
-        content = fetch_url_content(payload.url, timeout_seconds=payload.timeout_seconds, max_bytes=payload.max_bytes)
+        sanitized_url = sanitize_ingestion_url(payload.url)
+        content = fetch_url_content(sanitized_url, timeout_seconds=payload.timeout_seconds, max_bytes=payload.max_bytes)
+    except URLSanitizationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url not allowed: {exc}") from exc
     except URLFetchError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url fetch failed: {exc}") from exc
 
