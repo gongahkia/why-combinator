@@ -1,4 +1,3 @@
-(A) Implement deterministic random seed propagation across agent prompts for reproducible replay mode +agents +reproducibility
 (A) Implement replay endpoint that reruns scoring-only pipeline against frozen submissions and config snapshots +api +scoring
 (A) Implement replay diff generator showing score deltas between original and replay runs +scoring +analytics
 (B) Implement optional websocket stream for periodic checkpoint updates and leaderboard deltas +api +realtime

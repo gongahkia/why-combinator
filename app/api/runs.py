@@ -19,6 +19,7 @@ from app.events.outbox import enqueue_run_lifecycle_event_outbox
 from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.admission import evaluate_run_admission_capacity
 from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incomplete
+from app.orchestrator.reproducibility import REPLAY_SEED_ALGORITHM, derive_run_replay_seed
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 from app.queue.celery_app import celery_app
 from app.security.prompt_safety import PromptSafetyError, validate_challenge_prompt_safety
@@ -123,6 +124,15 @@ async def start_run(
     apply_run_state_transition(run, RunState.RUNNING, now=started_at)
     session.add(run)
     await session.flush()
+    reproducibility_snapshot = {
+        "seed_algorithm": REPLAY_SEED_ALGORITHM,
+        "run_seed": derive_run_replay_seed(run.id),
+    }
+    run.config_snapshot = {
+        **config_snapshot,
+        "reproducibility": reproducibility_snapshot,
+    }
+    config_snapshot = run.config_snapshot
     baseline_rows = await run_baseline_idea_generator_job(session, run, challenge)
     event = make_run_lifecycle_event(
         event_type="run_started",

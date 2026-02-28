@@ -306,7 +306,13 @@ def _dependencies_recovered_for_checkpoint_backfill() -> bool:
 
 
 @shared_task(name="app.queue.jobs.hacker_run", bind=True)
-def hacker_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
+def hacker_run(
+    self,
+    run_id: str,
+    trace_id: str | None = None,
+    agent_id: str | None = None,
+    run_seed: int | None = None,
+) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
     max_retries = 3
     try:
@@ -328,7 +334,7 @@ def hacker_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]
                 "trace_id": effective_trace_id,
             }
         try:
-            return run_hacker_job(run_id, trace_id=effective_trace_id)
+            return run_hacker_job(run_id, trace_id=effective_trace_id, agent_id=agent_id, run_seed=run_seed)
         finally:
             redis_client = create_redis_client()
             try:

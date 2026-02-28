@@ -13,10 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import load_settings
 from app.events.outbox import relay_outbox_events
 from app.judging.worker import run_judge_scoring_worker
+from app.orchestrator.reproducibility import derive_agent_prompt_seed, derive_run_replay_seed
 from app.orchestrator.run_completion import complete_run
 from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
+from app.prompting.hacker import HackerPromptInput, render_hacker_agent_prompt
 from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
+from app.scoring.weights import DEFAULT_WEIGHTS
 from app.scheduler.run_timeout import fail_stale_runs_without_worker_heartbeat
 from app.scoring.checkpoint import run_checkpoint_scoring_worker
 from app.security.secrets import build_scoped_model_secret_env
@@ -29,9 +32,49 @@ class JobResult:
     run_id: str
     status: str
 
-def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
+
+def _default_hacker_prompt_input(run_id: str, run_seed: int, agent_seed: int, agent_label: str) -> HackerPromptInput:
+    return HackerPromptInput(
+        challenge_title=f"Run {run_id}",
+        challenge_prompt="Build an MVP attempt that improves a measurable business KPI.",
+        criteria={
+            "quality": DEFAULT_WEIGHTS.quality,
+            "novelty": DEFAULT_WEIGHTS.novelty,
+            "feasibility": DEFAULT_WEIGHTS.feasibility,
+            "criteria": DEFAULT_WEIGHTS.criteria,
+        },
+        risk_appetite="balanced",
+        complexity_slider=0.5,
+        run_seed=run_seed,
+        agent_seed=agent_seed,
+        agent_label=agent_label,
+    )
+
+
+def run_hacker_job(
+    run_id: str,
+    trace_id: str | None = None,
+    agent_id: str | None = None,
+    run_seed: int | None = None,
+) -> dict[str, str]:
+    effective_agent_id = agent_id or run_id
+    effective_run_seed = derive_run_replay_seed(run_id) if run_seed is None else int(run_seed)
+    effective_agent_seed = derive_agent_prompt_seed(effective_run_seed, effective_agent_id)
+    prompt_input = _default_hacker_prompt_input(
+        run_id=run_id,
+        run_seed=effective_run_seed,
+        agent_seed=effective_agent_seed,
+        agent_label=effective_agent_id,
+    )
+    prompt_text = render_hacker_agent_prompt(prompt_input)
     if os.getenv("HACKER_RUNNER_ENABLED", "false").lower() != "true":
-        return asdict(JobResult(job_type="hacker-run", run_id=run_id, status="runner-disabled"))
+        return {
+            **asdict(JobResult(job_type="hacker-run", run_id=run_id, status="runner-disabled")),
+            "trace_id": trace_id or "",
+            "agent_id": effective_agent_id,
+            "run_seed": str(effective_run_seed),
+            "agent_seed": str(effective_agent_seed),
+        }
 
     image = os.getenv("HACKER_RUNNER_IMAGE", "alpine:3.20")
     hacker_output_payload = json.dumps(
@@ -48,12 +91,19 @@ def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
     ]
     runner = HackerAgentRunner()
     scoped_env = build_scoped_model_secret_env(
-        base_env={"RUN_ID": run_id, "TRACE_ID": trace_id or ""},
+        base_env={
+            "RUN_ID": run_id,
+            "TRACE_ID": trace_id or "",
+            "AGENT_ID": effective_agent_id,
+            "REPLAY_RUN_SEED": str(effective_run_seed),
+            "REPLAY_AGENT_SEED": str(effective_agent_seed),
+            "HACKER_AGENT_PROMPT": prompt_text,
+        },
         ttl_seconds=int(os.getenv("MODEL_API_KEY_TTL_SECONDS", "300")),
     )
     result = runner.run(
         spec=HackerAgentRunSpec(
-            agent_id=run_id,
+            agent_id=effective_agent_id,
             image=image,
             command=command,
             env=scoped_env,
@@ -78,6 +128,9 @@ def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
         "exit_code": "" if result.exit_code is None else str(result.exit_code),
         "log_path": result.log_path or "",
         "trace_id": trace_id or "",
+        "agent_id": effective_agent_id,
+        "run_seed": str(effective_run_seed),
+        "agent_seed": str(effective_agent_seed),
         "hacker_schema_valid": hacker_schema_valid,
         "hacker_schema_error": hacker_schema_error,
     }
