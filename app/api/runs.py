@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+import json
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.db.enums import RunState
-from app.db.models import Challenge, Run
+from app.db.models import Challenge, JudgeProfile, Run
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 
 router = APIRouter(prefix="/challenges", tags=["runs"])
@@ -33,6 +35,7 @@ class RunResponse(BaseModel):
 )
 async def start_run(
     challenge_id: uuid.UUID,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
 ) -> RunResponse:
     challenge = await session.get(Challenge, challenge_id)
@@ -44,14 +47,48 @@ async def start_run(
     except RunStartValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
+    judge_stmt: Select[tuple[JudgeProfile]] = select(JudgeProfile).where(JudgeProfile.challenge_id == challenge_id)
+    judge_profiles = (await session.execute(judge_stmt)).scalars().all()
+    config_snapshot = {
+        "challenge": {
+            "id": str(challenge.id),
+            "title": challenge.title,
+            "prompt": challenge.prompt,
+            "iteration_window_seconds": challenge.iteration_window_seconds,
+            "minimum_quality_threshold": challenge.minimum_quality_threshold,
+            "risk_appetite": challenge.risk_appetite,
+            "complexity_slider": challenge.complexity_slider,
+        },
+        "judge_profiles": [
+            {
+                "id": str(profile.id),
+                "domain": profile.domain,
+                "scoring_style": profile.scoring_style,
+                "profile_prompt": profile.profile_prompt,
+                "head_judge": profile.head_judge,
+                "source_type": profile.source_type,
+            }
+            for profile in judge_profiles
+        ],
+    }
+    started_at = datetime.now(timezone.utc)
     run = Run(
         challenge_id=challenge_id,
         state=RunState.RUNNING,
-        started_at=datetime.now(timezone.utc),
-        config_snapshot={},
+        started_at=started_at,
+        config_snapshot=config_snapshot,
     )
     session.add(run)
     await session.commit()
     await session.refresh(run)
+
+    event = {
+        "event_type": "run_started",
+        "occurred_at": started_at.isoformat(),
+        "run_id": str(run.id),
+        "challenge_id": str(challenge_id),
+        "config_snapshot": config_snapshot,
+    }
+    await request.app.state.redis.publish("run_events", json.dumps(event))
 
     return RunResponse.model_validate(run, from_attributes=True)
