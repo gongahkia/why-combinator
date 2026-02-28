@@ -1,4 +1,3 @@
-(A) Implement run state machine with legal transitions for created, running, canceling, completed, canceled, failed +run +validation
 (A) Implement automatic stale run failure transition when no worker heartbeat updates within configured interval +run +reliability
 (A) Implement API endpoint to retrieve per-agent productivity metrics including attempts, accepted MVPs, and penalties +api +analytics
 (A) Implement API endpoint to retrieve per-judge disagreement metrics and inter-judge variance per checkpoint +api +analytics

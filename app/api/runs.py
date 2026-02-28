@@ -22,6 +22,7 @@ from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incompl
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 from app.queue.celery_app import celery_app
 from app.security.prompt_safety import PromptSafetyError, validate_challenge_prompt_safety
+from app.validation.run_state_machine import RunStateTransitionError, apply_run_state_transition
 
 router = APIRouter(prefix="/challenges", tags=["runs"])
 
@@ -42,6 +43,10 @@ class RunCancelResponse(BaseModel):
     state: RunState
     killed_containers: list[str]
     revoked_task_ids: list[str]
+
+
+class RunStateTransitionRequest(BaseModel):
+    state: RunState
 
 
 @router.post(
@@ -111,10 +116,11 @@ async def start_run(
     started_at = datetime.now(timezone.utc)
     run = Run(
         challenge_id=challenge_id,
-        state=RunState.RUNNING,
+        state=RunState.CREATED,
         started_at=started_at,
         config_snapshot=config_snapshot,
     )
+    apply_run_state_transition(run, RunState.RUNNING, now=started_at)
     session.add(run)
     await session.flush()
     baseline_rows = await run_baseline_idea_generator_job(session, run, challenge)
@@ -178,10 +184,14 @@ async def cancel_run(
     if run is None or run.challenge_id != challenge_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
 
+    try:
+        apply_run_state_transition(run, RunState.CANCELING)
+    except RunStateTransitionError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
     killed_containers = _kill_active_run_containers(run_id)
     revoked_task_ids = _revoke_run_tasks(run_id)
-    run.state = RunState.CANCELED
-    run.ended_at = datetime.now(timezone.utc)
+    apply_run_state_transition(run, RunState.CANCELED, now=datetime.now(timezone.utc))
     await session.commit()
 
     return RunCancelResponse(
@@ -190,3 +200,25 @@ async def cancel_run(
         killed_containers=killed_containers,
         revoked_task_ids=revoked_task_ids,
     )
+
+
+@router.post("/{challenge_id}/runs/{run_id}/state", response_model=RunResponse)
+async def transition_run_state(
+    challenge_id: uuid.UUID,
+    run_id: uuid.UUID,
+    payload: RunStateTransitionRequest,
+    _rate_limit: None = rate_limit_dependency("run-control", capacity=20, refill_per_second=0.5),
+    session: AsyncSession = Depends(get_db_session),
+) -> RunResponse:
+    run = await session.get(Run, run_id)
+    if run is None or run.challenge_id != challenge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+
+    try:
+        apply_run_state_transition(run, payload.state)
+    except RunStateTransitionError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    await session.commit()
+    await session.refresh(run)
+    return RunResponse.model_validate(run, from_attributes=True)

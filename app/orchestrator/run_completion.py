@@ -11,6 +11,7 @@ from app.db.models import Agent, Challenge, Run, Submission
 from app.leaderboard.materializer import materialize_leaderboard
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.scoring.penalties import generate_non_production_penalties
+from app.validation.run_state_machine import apply_run_state_transition
 from app.validation.submission_state_machine import apply_submission_state_transition
 
 
@@ -64,8 +65,7 @@ async def complete_run(session: AsyncSession, run_id: uuid.UUID) -> dict[str, in
     penalty_events = await generate_non_production_penalties(session, run_id, checkpoint_id="run_end")
     leaderboard_entries = await materialize_leaderboard(session, run_id)
 
-    run.state = RunState.COMPLETED
-    run.ended_at = datetime.now(UTC)
+    apply_run_state_transition(run, RunState.COMPLETED, now=datetime.now(UTC))
     await session.commit()
     return {
         "auto_attempts_created": auto_attempts_created,
