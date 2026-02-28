@@ -1,4 +1,3 @@
-(A) Implement mandatory submission validator enforcing runnable artifact, short README artifact, and value hypothesis field +submissions +validation
 (A) Implement non-production penalty generator when agent produces zero valid submissions by run end +penalties +scoring
 (A) Implement similarity scorer using embedding cosine similarity across submission summaries and artifact fingerprints +novelty +scoring
 (A) Implement artifact overlap detector using file hash shingles and dependency manifest overlap metrics +novelty +scoring

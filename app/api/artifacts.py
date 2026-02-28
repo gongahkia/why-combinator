@@ -3,9 +3,11 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
@@ -34,6 +36,12 @@ class ArtifactUploadResponse(BaseModel):
     content_hash: str
     created_at: datetime
     updated_at: datetime
+
+
+class SubmissionValidationResponse(BaseModel):
+    submission_id: uuid.UUID
+    valid: bool
+    errors: list[str]
 
 
 @router.post(
@@ -77,3 +85,63 @@ async def upload_artifact(
     await session.commit()
     await session.refresh(artifact)
     return ArtifactUploadResponse.model_validate(artifact, from_attributes=True)
+
+
+def _is_runnable_artifact(artifact: Artifact) -> bool:
+    return artifact.artifact_type in {
+        ArtifactType.WEB_BUNDLE,
+        ArtifactType.CLI_PACKAGE,
+        ArtifactType.API_SERVICE,
+        ArtifactType.NOTEBOOK,
+    }
+
+
+def _looks_like_readme(storage_key: str) -> bool:
+    filename = storage_key.split("/", 1)[-1]
+    if "_" in filename:
+        _, filename = filename.split("_", 1)
+    return filename.lower().startswith("readme")
+
+
+def _is_short_readme(path: Path, max_chars: int = 3000) -> bool:
+    if not path.exists():
+        return False
+    text = path.read_text(encoding="utf-8", errors="ignore").strip()
+    return bool(text) and len(text) <= max_chars
+
+
+@router.get(
+    "/{submission_id}/validation",
+    response_model=SubmissionValidationResponse,
+)
+async def validate_submission_mandatory_requirements(
+    submission_id: uuid.UUID,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> SubmissionValidationResponse:
+    submission = await session.get(Submission, submission_id)
+    if submission is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submission not found")
+
+    artifact_stmt: Select[tuple[Artifact]] = select(Artifact).where(Artifact.submission_id == submission_id)
+    artifacts = (await session.execute(artifact_stmt)).scalars().all()
+    errors: list[str] = []
+
+    if not submission.value_hypothesis.strip():
+        errors.append("value_hypothesis is required")
+    if not any(_is_runnable_artifact(artifact) for artifact in artifacts):
+        errors.append("at least one runnable artifact is required")
+
+    readme_artifact = next((artifact for artifact in artifacts if _looks_like_readme(artifact.storage_key)), None)
+    if readme_artifact is None:
+        errors.append("README artifact is required")
+    else:
+        readme_path = Path(request.app.state.settings.artifact_storage_path) / readme_artifact.storage_key
+        if not _is_short_readme(readme_path):
+            errors.append("README artifact must be non-empty and at most 3000 characters")
+
+    return SubmissionValidationResponse(
+        submission_id=submission_id,
+        valid=len(errors) == 0,
+        errors=errors,
+    )
