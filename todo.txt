@@ -1,1 +1,0 @@
-(B) Add a reproducible render pipeline to export a 1080p 2-minute MP4 demo with captions, narration track sync points, and final QA checklist +demo +remotion

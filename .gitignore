@@ -1,2 +1,5 @@
 __pycache__/
 *.py[cod]
+demo/remotion/node_modules/
+demo/remotion/build/
+demo/remotion/out/

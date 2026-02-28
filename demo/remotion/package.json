@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "remotion studio",
     "build": "remotion bundle src/index.ts --out-dir build",
-    "render": "remotion render src/index.ts DemoMaster out/demo-master.mp4 --codec=h264 --audio-codec=aac --pixel-format=yuv420p"
+    "render": "npm run render:demo",
+    "render:demo": "node ./scripts/render-demo.mjs",
+    "qa:render": "node ./scripts/qa-check.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

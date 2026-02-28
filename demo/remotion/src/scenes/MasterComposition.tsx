@@ -1,13 +1,27 @@
 import React from 'react';
-import {AbsoluteFill, Sequence, interpolate, useCurrentFrame} from 'remotion';
+import {
+  AbsoluteFill,
+  Audio,
+  Sequence,
+  getInputProps,
+  interpolate,
+  staticFile,
+  useCurrentFrame,
+} from 'remotion';
 
 import {ApiPayloadCard} from '../components/ApiPayloadCard';
+import {CaptionOverlay} from '../components/CaptionOverlay';
 import {MetricTile} from '../components/MetricTile';
 import {SceneLayout} from '../components/SceneLayout';
 import {SceneTransition} from '../components/SceneTransition';
+import {narrationSyncPoints} from '../data/narrationSyncPoints';
 import {fontStack, palette} from '../theme';
 
 const SCENE_LENGTH = 360;
+
+type MasterInputProps = {
+  narrationTrack?: string | null;
+};
 
 const scenes = [
   {id: 'intro', from: 0},
@@ -135,8 +149,12 @@ const ProgressRail: React.FC = () => {
 };
 
 export const MasterComposition: React.FC = () => {
+  const {narrationTrack} = getInputProps<MasterInputProps>();
+
   return (
     <AbsoluteFill>
+      {narrationTrack ? <Audio src={staticFile(narrationTrack)} /> : null}
+
       <Sequence from={scenes[0].from} durationInFrames={SCENE_LENGTH}>
         <SceneTransition>
           <SceneLayout
@@ -256,6 +274,7 @@ export const MasterComposition: React.FC = () => {
         </SceneTransition>
       </Sequence>
 
+      <CaptionOverlay syncPoints={narrationSyncPoints} />
       <GlobalProgress />
     </AbsoluteFill>
   );
