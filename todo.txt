@@ -1,4 +1,3 @@
-(B) Implement adaptive checkpoint interval scaling based on queue depth and worker throughput +scheduler +performance
 (B) Implement integration test for scheduler failover ensuring exactly one active dispatcher at any time +tests +scheduler
 (B) Implement integration test for outbox relay guaranteeing no duplicate event publication on retries +tests +events
 (B) Implement integration test for run replay producing deterministic score output with fixed seed +tests +reproducibility

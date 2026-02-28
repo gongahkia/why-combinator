@@ -4,7 +4,9 @@ import hashlib
 import os
 import uuid
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from redis.asyncio import Redis
 from sqlalchemy import Select, select
@@ -14,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from app.db.enums import RunState
 from app.db.models import CheckpointSnapshot, Run
 from app.observability.trace import new_trace_id
+from app.queue.celery_app import celery_app
 from app.queue.jobs import checkpoint_score
 from app.scheduler.leader_election import (
     load_scheduler_leader_id,
@@ -32,6 +35,29 @@ def load_checkpoint_max_enqueues_per_tick() -> int:
 
 def load_checkpoint_jitter_seconds() -> int:
     return int(os.getenv("CHECKPOINT_JITTER_SECONDS", "0"))
+
+
+def load_checkpoint_adaptive_interval_enabled() -> bool:
+    return os.getenv("CHECKPOINT_ADAPTIVE_INTERVAL_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+
+
+def load_checkpoint_adaptive_min_interval_seconds() -> int:
+    return int(os.getenv("CHECKPOINT_ADAPTIVE_MIN_INTERVAL_SECONDS", "30"))
+
+
+def load_checkpoint_adaptive_max_interval_seconds() -> int:
+    return int(os.getenv("CHECKPOINT_ADAPTIVE_MAX_INTERVAL_SECONDS", "300"))
+
+
+def load_checkpoint_adaptive_target_tasks_per_worker() -> int:
+    return int(os.getenv("CHECKPOINT_ADAPTIVE_TARGET_TASKS_PER_WORKER", "4"))
+
+
+@dataclass(frozen=True)
+class AdaptiveCheckpointInterval:
+    interval_seconds: int
+    queue_depth: int
+    throughput_capacity: int
 
 
 def _weighted_fair_due_order(runs: list[Run]) -> list[Run]:
@@ -58,6 +84,51 @@ def _ensure_utc_timestamp(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+
+def resolve_adaptive_checkpoint_interval_seconds(
+    base_interval_seconds: int,
+    inspect_client: Any | None = None,
+) -> AdaptiveCheckpointInterval:
+    normalized_base = max(1, base_interval_seconds)
+    if not load_checkpoint_adaptive_interval_enabled():
+        return AdaptiveCheckpointInterval(
+            interval_seconds=normalized_base,
+            queue_depth=0,
+            throughput_capacity=0,
+        )
+
+    min_interval = max(1, load_checkpoint_adaptive_min_interval_seconds())
+    max_interval = max(min_interval, load_checkpoint_adaptive_max_interval_seconds())
+    target_per_worker = max(1, load_checkpoint_adaptive_target_tasks_per_worker())
+    inspector = inspect_client if inspect_client is not None else celery_app.control.inspect(timeout=1.0)
+    try:
+        active_payload = inspector.active() or {}
+        reserved_payload = inspector.reserved() or {}
+    except Exception:
+        return AdaptiveCheckpointInterval(
+            interval_seconds=min(max(normalized_base, min_interval), max_interval),
+            queue_depth=0,
+            throughput_capacity=0,
+        )
+
+    active_tasks = sum(len(tasks) for tasks in active_payload.values())
+    reserved_tasks = sum(len(tasks) for tasks in reserved_payload.values())
+    queue_depth = active_tasks + reserved_tasks
+    worker_count = max(1, len(set(active_payload.keys()) | set(reserved_payload.keys())))
+    throughput_capacity = max(1, worker_count * target_per_worker)
+
+    if queue_depth <= 0:
+        scaling_factor = 0.5
+    else:
+        scaling_factor = max(0.5, min(4.0, queue_depth / throughput_capacity))
+    scaled_interval = int(round(normalized_base * scaling_factor))
+    clamped_interval = min(max_interval, max(min_interval, scaled_interval))
+    return AdaptiveCheckpointInterval(
+        interval_seconds=clamped_interval,
+        queue_depth=queue_depth,
+        throughput_capacity=throughput_capacity,
+    )
 
 
 def _run_checkpoint_jitter_seconds(
@@ -112,7 +183,9 @@ async def enqueue_periodic_checkpoint_scores(
     now: datetime | None = None,
 ) -> list[str]:
     current_time = now or datetime.now(UTC)
-    interval_seconds = max(1, load_checkpoint_interval_seconds())
+    base_interval_seconds = max(1, load_checkpoint_interval_seconds())
+    interval_decision = resolve_adaptive_checkpoint_interval_seconds(base_interval_seconds)
+    interval_seconds = interval_decision.interval_seconds
     interval = timedelta(seconds=interval_seconds)
     scheduled_run_ids: list[str] = []
     leader_id = load_scheduler_leader_id()
