@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import uuid
 from datetime import datetime
 import re
 
 import yaml
-from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,6 +72,20 @@ class JudgeProfileResponse(BaseModel):
     updated_at: datetime
 
 
+def _to_judge_profile_response(profile: JudgeProfile) -> JudgeProfileResponse:
+    return JudgeProfileResponse(
+        id=profile.id,
+        challenge_id=profile.challenge_id,
+        domain=profile.domain,
+        scoring_style=profile.scoring_style,
+        profile_prompt=profile.profile_prompt,
+        head_judge=profile.head_judge,
+        source_type=profile.source_type,
+        created_at=profile.created_at,
+        updated_at=profile.updated_at,
+    )
+
+
 def normalize_profiles(payload: object) -> list[JudgeProfileInput]:
     if isinstance(payload, dict) and "profiles" in payload:
         profiles = payload["profiles"]
@@ -98,6 +113,66 @@ def parse_csv_profiles(payload: str) -> list[JudgeProfileInput]:
             }
         )
     return normalize_profiles(normalized)
+
+
+def _detect_bulk_file_format(filename: str, content_type: str | None) -> str:
+    lowered_name = filename.lower()
+    if lowered_name.endswith(".json"):
+        return "json"
+    if lowered_name.endswith(".yaml") or lowered_name.endswith(".yml"):
+        return "yaml"
+    if lowered_name.endswith(".csv"):
+        return "csv"
+
+    lowered_type = (content_type or "").lower()
+    if "json" in lowered_type:
+        return "json"
+    if "yaml" in lowered_type or "yml" in lowered_type:
+        return "yaml"
+    if "csv" in lowered_type:
+        return "csv"
+
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"unsupported bulk profile file format: {filename}",
+    )
+
+
+def parse_bulk_profile_file(
+    filename: str,
+    content: bytes,
+    content_type: str | None,
+) -> tuple[list[JudgeProfileInput], str]:
+    file_format = _detect_bulk_file_format(filename, content_type)
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"invalid utf-8 in bulk profile file: {filename}",
+        ) from exc
+
+    if file_format == "json":
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid json in bulk profile file {filename}: {exc}",
+            ) from exc
+        return normalize_profiles(parsed), "bulk_json"
+
+    if file_format == "yaml":
+        try:
+            parsed = yaml.safe_load(text)
+        except yaml.YAMLError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"invalid yaml in bulk profile file {filename}: {exc}",
+            ) from exc
+        return normalize_profiles(parsed), "bulk_yaml"
+
+    return parse_csv_profiles(text), "bulk_csv"
 
 
 async def persist_profiles(
@@ -138,20 +213,7 @@ async def persist_profiles(
     for profile in db_profiles:
         await session.refresh(profile)
 
-    return [
-        JudgeProfileResponse(
-            id=profile.id,
-            challenge_id=profile.challenge_id,
-            domain=profile.domain,
-            scoring_style=profile.scoring_style,
-            profile_prompt=profile.profile_prompt,
-            head_judge=profile.head_judge,
-            source_type=profile.source_type,
-            created_at=profile.created_at,
-            updated_at=profile.updated_at,
-        )
-        for profile in db_profiles
-    ]
+    return [_to_judge_profile_response(profile) for profile in db_profiles]
 
 
 @router.post(
@@ -198,6 +260,65 @@ async def register_judge_profiles_csv(
 ) -> list[JudgeProfileResponse]:
     profiles = parse_csv_profiles(payload)
     return await persist_profiles(challenge_id, profiles, "csv", session)
+
+
+@router.post(
+    "/{challenge_id}/judge-profiles/bulk",
+    status_code=status.HTTP_201_CREATED,
+    response_model=list[JudgeProfileResponse],
+)
+async def register_judge_profiles_bulk(
+    challenge_id: uuid.UUID,
+    files: list[UploadFile] = File(...),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[JudgeProfileResponse]:
+    if not files:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="at least one file is required")
+
+    challenge = await session.get(Challenge, challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+
+    parsed_profiles: list[tuple[JudgeProfileInput, str]] = []
+    for file in files:
+        filename = (file.filename or "uploaded-profile").strip() or "uploaded-profile"
+        content = await file.read()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"bulk profile file is empty: {filename}",
+            )
+        profile_inputs, source_type = parse_bulk_profile_file(filename, content, file.content_type)
+        parsed_profiles.extend((profile_input, source_type) for profile_input in profile_inputs)
+
+    existing_head_stmt: Select[tuple[int]] = select(func.count()).select_from(JudgeProfile).where(
+        JudgeProfile.challenge_id == challenge_id,
+        JudgeProfile.head_judge.is_(True),
+    )
+    existing_head_count = (await session.execute(existing_head_stmt)).scalar_one()
+    incoming_head_count = sum(1 for item, _source in parsed_profiles if item.head_judge)
+    if existing_head_count + incoming_head_count > 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="at most one head_judge is allowed per challenge panel",
+        )
+
+    db_profiles = [
+        JudgeProfile(
+            challenge_id=challenge_id,
+            domain=item.domain,
+            scoring_style=item.scoring_style,
+            profile_prompt=item.profile_prompt,
+            head_judge=item.head_judge,
+            source_type=source_type,
+        )
+        for item, source_type in parsed_profiles
+    ]
+    session.add_all(db_profiles)
+    await session.commit()
+    for profile in db_profiles:
+        await session.refresh(profile)
+    return [_to_judge_profile_response(profile) for profile in db_profiles]
 
 
 @router.post(
