@@ -226,3 +226,16 @@ class IdempotencyKey(TimestampMixin, Base):
     key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     response_payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class ChallengeApiKey(TimestampMixin, Base):
+    __tablename__ = "challenge_api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    challenge_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("challenges.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    key_hash: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
+    key_last4: Mapped[str] = mapped_column(String(4), nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
