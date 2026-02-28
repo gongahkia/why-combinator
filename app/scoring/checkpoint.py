@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import load_settings
 from app.db.models import Artifact, Challenge, Run, ScoreEvent, Submission
 from app.judging.worker import run_judge_scoring_worker
 from app.leaderboard.materializer import materialize_leaderboard
@@ -125,6 +126,7 @@ async def run_checkpoint_scoring_worker(
         raise ValueError("challenge not found")
 
     active_weights_snapshot = await resolve_active_weights_snapshot(session, run_id, now)
+    artifact_storage_root = load_settings().artifact_storage_path
     active_weights = asdict(active_weights_snapshot)
     score_component_bounds = load_score_component_bounds()
     novelty_policy = resolve_novelty_penalty_sensitivity_policy(challenge.risk_appetite)
@@ -182,7 +184,11 @@ async def run_checkpoint_scoring_worker(
         artifact_count = len(artifacts)
         quality_score = await score_submission_quality(session, submission.id, checkpoint_id=checkpoint_id)
         similarity_score = await score_submission_similarity(session, submission.id)
-        anti_gaming_score = await detect_template_clone_penalty(session, submission.id)
+        anti_gaming_score = await detect_template_clone_penalty(
+            session,
+            submission.id,
+            storage_root=artifact_storage_root,
+        )
         too_safe_score = await score_too_safe_penalty(session, submission.id)
         sophistication_rubric = evaluate_artifact_sophistication_rubric(
             artifact_types=[artifact.artifact_type for artifact in artifacts],

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.artifacts.fingerprinting import score_submission_ast_similarity
 from app.db.models import Submission
 
 
@@ -39,7 +40,11 @@ def _shallow_mutation_similarity(left: str, right: str) -> float:
     return round((0.6 * ratio) + (0.4 * jaccard), 6)
 
 
-async def detect_template_clone_penalty(session: AsyncSession, submission_id: uuid.UUID) -> AntiGamingScore:
+async def detect_template_clone_penalty(
+    session: AsyncSession,
+    submission_id: uuid.UUID,
+    storage_root: str | None = None,
+) -> AntiGamingScore:
     submission = await session.get(Submission, submission_id)
     if submission is None:
         raise ValueError("submission not found")
@@ -58,16 +63,32 @@ async def detect_template_clone_penalty(session: AsyncSession, submission_id: uu
             compared_submissions=0,
         )
 
-    best_similarity = 0.0
-    best_peer_id: uuid.UUID | None = None
+    best_text_similarity = 0.0
+    best_text_peer_id: uuid.UUID | None = None
     for peer in peers:
         peer_text = _normalize_text(f"{peer.summary} {peer.value_hypothesis}")
         similarity = _shallow_mutation_similarity(current_text, peer_text)
-        if similarity > best_similarity:
-            best_similarity = similarity
-            best_peer_id = peer.id
+        if similarity > best_text_similarity:
+            best_text_similarity = similarity
+            best_text_peer_id = peer.id
 
-    # Penalize only high textual overlap to target shallow mutations of template outputs.
+    best_ast_similarity = 0.0
+    best_ast_peer_id: uuid.UUID | None = None
+    if storage_root:
+        best_ast_similarity, best_ast_peer_id = await score_submission_ast_similarity(
+            session,
+            submission_id=submission_id,
+            storage_root=storage_root,
+        )
+
+    if best_ast_similarity >= best_text_similarity:
+        best_similarity = best_ast_similarity
+        best_peer_id = best_ast_peer_id
+    else:
+        best_similarity = best_text_similarity
+        best_peer_id = best_text_peer_id
+
+    # Penalize only high overlap (textual or AST structural) to target shallow template mutations.
     penalty = best_similarity if best_similarity >= 0.85 else 0.0
     return AntiGamingScore(
         submission_id=submission_id,
