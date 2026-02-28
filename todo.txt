@@ -1,4 +1,3 @@
-(A) Implement run bootstrap seeding of default judge panel domains when user panel is incomplete +judging +orchestrator
 (A) Implement compliance-domain auto-suggestion when prompt matches regulated keywords and user has no compliance judge +judging +policy
 (A) Implement safe curl fetch wrapper with connect/read timeout, max redirects, and content-length cap +ingest +security
 (A) Implement URL fetch content hashing and cache keying in Redis to avoid repeated profile downloads +ingest +cache
