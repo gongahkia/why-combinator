@@ -29,6 +29,18 @@ class _FakeRelayRedis:
         return 1
 
 
+class _FlakyRelayRedis(_FakeRelayRedis):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+
+    def eval(self, script: str, num_keys: int, dedup_key: str, ttl_ms: int, stream_name: str, payload_json: str) -> int:  # noqa: ARG002
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError("temporary redis outage")
+        return super().eval(script, num_keys, dedup_key, ttl_ms, stream_name, payload_json)
+
+
 class _FakeAsyncRedis:
     def __init__(self) -> None:
         self.kv: dict[str, int] = {}
@@ -90,6 +102,47 @@ async def test_outbox_relay_marks_deduplicated_event_as_published(session: Async
     assert persisted is not None
     assert persisted.published_at is not None
     assert persisted.publish_attempts == 1
+
+
+@pytest.mark.asyncio
+async def test_outbox_relay_retry_publishes_event_once_without_duplicates(session: AsyncSession) -> None:
+    event = make_run_lifecycle_event(
+        event_type="run_started",
+        run_id=uuid.uuid4(),
+        challenge_id=uuid.uuid4(),
+        payload={"started_at": datetime.now(UTC).isoformat()},
+    )
+    outbox_row = await enqueue_run_lifecycle_event_outbox(session, event)
+    await session.commit()
+
+    relay_redis = _FlakyRelayRedis()
+
+    first = await relay_outbox_events(session, relay_redis, batch_size=10)
+    await session.commit()
+    assert first.processed == 1
+    assert first.published == 0
+    assert first.failed == 1
+    persisted_after_failure = await session.get(OutboxEvent, outbox_row.id)
+    assert persisted_after_failure is not None
+    assert persisted_after_failure.published_at is None
+    assert persisted_after_failure.publish_attempts == 1
+    assert persisted_after_failure.last_error is not None
+
+    second = await relay_outbox_events(session, relay_redis, batch_size=10)
+    await session.commit()
+    assert second.processed == 1
+    assert second.published == 1
+    assert second.failed == 0
+    persisted_after_retry = await session.get(OutboxEvent, outbox_row.id)
+    assert persisted_after_retry is not None
+    assert persisted_after_retry.published_at is not None
+    assert persisted_after_retry.publish_attempts == 2
+    assert persisted_after_retry.last_error is None
+    assert len(relay_redis.published) == 1
+
+    third = await relay_outbox_events(session, relay_redis, batch_size=10)
+    assert third.processed == 0
+    assert third.published == 0
 
 
 @pytest.mark.asyncio
