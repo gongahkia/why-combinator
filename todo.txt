@@ -1,4 +1,3 @@
-(A) Implement max artifact count and max total artifact size validation per submission +validation +artifacts
 (A) Implement duplicate artifact detection by content hash and soft-link reuse in storage layer +artifacts +storage
 (A) Implement challenge prompt safety filter that rejects disallowed execution intents before run creation +security +challenge
 (A) Implement strict JSON schema validation for model responses from hacker and judge agents +agents +validation

@@ -21,6 +21,7 @@ from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
+from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
 
 router = APIRouter(prefix="/runs", tags=["submissions"])
 
@@ -128,6 +129,15 @@ async def ingest_submission_transactional(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="agent does not belong to run")
 
     adapter = LocalObjectStorageAdapter(request.app.state.settings.artifact_storage_path)
+    decoded_artifacts = [(artifact_input, base64.b64decode(artifact_input.content_base64)) for artifact_input in payload.artifacts]
+    try:
+        validate_artifact_submission_limits(
+            existing_count=0,
+            existing_total_bytes=0,
+            incoming_sizes=[len(content) for _, content in decoded_artifacts],
+        )
+    except ArtifactLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     summary = generate_submission_semantic_summary(
         challenge_prompt=challenge.prompt,
         value_hypothesis=payload.value_hypothesis,
@@ -144,8 +154,7 @@ async def ingest_submission_transactional(
         await session.flush()
 
         artifact_ids: list[uuid.UUID] = []
-        for artifact_input in payload.artifacts:
-            content = base64.b64decode(artifact_input.content_base64)
+        for artifact_input, content in decoded_artifacts:
             try:
                 validate_archive_members_safe(content, artifact_input.filename)
             except ArchiveExtractionError as exc:

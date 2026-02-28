@@ -15,6 +15,7 @@ from app.db.enums import ArtifactType
 from app.db.models import Artifact, Submission
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
+from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
 
 router = APIRouter(prefix="/submissions", tags=["artifacts"])
 
@@ -72,6 +73,22 @@ async def upload_artifact(
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="artifact file is empty")
+    artifact_stmt: Select[tuple[Artifact]] = select(Artifact).where(Artifact.submission_id == submission_id)
+    existing_artifacts = (await session.execute(artifact_stmt)).scalars().all()
+    storage_root = Path(request.app.state.settings.artifact_storage_path)
+    existing_total_bytes = 0
+    for artifact in existing_artifacts:
+        path = storage_root / artifact.storage_key
+        if path.exists():
+            existing_total_bytes += path.stat().st_size
+    try:
+        validate_artifact_submission_limits(
+            existing_count=len(existing_artifacts),
+            existing_total_bytes=existing_total_bytes,
+            incoming_sizes=[len(content)],
+        )
+    except ArtifactLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     try:
         validate_archive_members_safe(content, file.filename or "artifact.bin")
     except ArchiveExtractionError as exc:
