@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +12,11 @@ from app.db.idempotency import (
     store_idempotent_response,
 )
 from app.db.models import ScoreEvent
+
+
+def compute_score_event_payload_checksum(payload: dict[str, object]) -> str:
+    normalized = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(normalized).hexdigest()
 
 
 async def create_score_event_idempotent(
@@ -53,6 +60,7 @@ async def create_score_event_idempotent(
         criteria_score=criteria_score,
         final_score=final_score,
         payload=payload,
+        payload_checksum=compute_score_event_payload_checksum(payload),
     )
     session.add(score_event)
     await session.flush()

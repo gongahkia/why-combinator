@@ -138,6 +138,7 @@ class ScoreEvent(TimestampMixin, Base):
     criteria_score: Mapped[float] = mapped_column(Float, nullable=False)
     final_score: Mapped[float] = mapped_column(Float, nullable=False, index=True)
     payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    payload_checksum: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
 
     submission: Mapped[Submission] = relationship(back_populates="score_events")
 
