@@ -1,4 +1,3 @@
-(A) Implement head judge uniqueness rule allowing at most one head_judge per panel +judging +validation
 (A) Implement criteria weight validator enforcing non-negative weights and normalized sum to 1.0 +scoring +validation
 (A) Implement penalty weight validator for similarity and too-safe penalties with bounded ranges +scoring +validation
 (A) Implement feasibility scorer extracting build/run signal from runtime validator outputs and dependency resolution logs +scoring +validation

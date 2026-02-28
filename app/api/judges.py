@@ -9,6 +9,7 @@ import re
 import yaml
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
@@ -105,6 +106,18 @@ async def persist_profiles(
     challenge = await session.get(Challenge, challenge_id)
     if challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+
+    existing_head_stmt: Select[tuple[int]] = select(func.count()).select_from(JudgeProfile).where(
+        JudgeProfile.challenge_id == challenge_id,
+        JudgeProfile.head_judge.is_(True),
+    )
+    existing_head_count = (await session.execute(existing_head_stmt)).scalar_one()
+    incoming_head_count = sum(1 for item in profiles if item.head_judge)
+    if existing_head_count + incoming_head_count > 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="at most one head_judge is allowed per challenge panel",
+        )
 
     db_profiles = [
         JudgeProfile(
