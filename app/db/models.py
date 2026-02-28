@@ -149,6 +149,7 @@ class PenaltyEvent(TimestampMixin, Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True)
     checkpoint_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default="system")
     penalty_type: Mapped[str] = mapped_column(String(64), nullable=False)
     value: Mapped[float] = mapped_column(Float, nullable=False)
     explanation: Mapped[str] = mapped_column(Text, nullable=False)

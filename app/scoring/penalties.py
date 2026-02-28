@@ -50,6 +50,7 @@ async def generate_non_production_penalties(
             event = PenaltyEvent(
                 submission_id=submission.id,
                 checkpoint_id=checkpoint_id,
+                source="run_completion_non_production",
                 penalty_type="non_production",
                 value=penalty_value,
                 explanation="agent produced zero accepted submissions by run end",

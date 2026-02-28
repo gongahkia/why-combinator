@@ -1,4 +1,3 @@
-(A) Implement penalty event append-only table writes with source explanation and checkpoint id +db +penalties
 (A) Implement checkpoint snapshot table to record active weights and policies at each scoring interval +db +scoring
 (A) Implement query layer to reconstruct effective config timeline for audit-safe forward-only scoring +db +scoring
 (A) Implement automatic challenge state guard preventing edits to immutable fields after run start +challenge +validation
