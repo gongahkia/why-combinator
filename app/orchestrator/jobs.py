@@ -46,6 +46,7 @@ def run_hacker_job(run_id: str) -> dict[str, str]:
             image=image,
             command=command,
             env=scoped_env,
+            task_type="hacker_run",
         ),
         limits=load_hacker_runner_limits_from_env(),
     )
@@ -55,6 +56,7 @@ def run_hacker_job(run_id: str) -> dict[str, str]:
         "status": "timeout" if result.timed_out else "completed",
         "container_name": result.container_name,
         "exit_code": "" if result.exit_code is None else str(result.exit_code),
+        "log_path": result.log_path or "",
     }
 
 
