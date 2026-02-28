@@ -1,4 +1,3 @@
-(A) Implement FastAPI service bootstrap with lifespan hooks for Postgres and Redis connection pools +api +infra
 (A) Implement Redis-backed task queue workers for hacker-run, judge-run, and checkpoint-score jobs using Celery +queue +orchestrator
 (A) Implement SQLAlchemy models for Challenge, Run, Agent, SubagentEdge, Submission, Artifact, ScoreEvent, and PenaltyEvent +db
 (A) Implement Alembic migration creating normalized tables with foreign keys, unique constraints, and created_at/updated_at indexes +db

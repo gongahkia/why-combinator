@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bengers-and-mesh-too"
+version = "0.1.0"
+description = "Hackathon orchestration service"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.111.0",
+  "redis>=5.0.0",
+  "sqlalchemy>=2.0.0",
+  "uvicorn>=0.30.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
