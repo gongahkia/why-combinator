@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 import json
+import subprocess
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
 from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
+from app.queue.celery_app import celery_app
 
 router = APIRouter(prefix="/challenges", tags=["runs"])
 
@@ -27,6 +29,13 @@ class RunResponse(BaseModel):
     config_snapshot: dict[str, object]
     created_at: datetime
     updated_at: datetime
+
+
+class RunCancelResponse(BaseModel):
+    run_id: uuid.UUID
+    state: RunState
+    killed_containers: list[str]
+    revoked_task_ids: list[str]
 
 
 @router.post(
@@ -99,3 +108,56 @@ async def start_run(
     await request.app.state.redis.publish("run_events", json.dumps(event))
 
     return RunResponse.model_validate(run, from_attributes=True)
+
+
+def _kill_active_run_containers(run_id: uuid.UUID) -> list[str]:
+    run_token = str(run_id)[:12]
+    list_proc = subprocess.run(
+        ["docker", "ps", "-q", "--filter", f"name=hacker-agent-{run_token}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    container_ids = [line.strip() for line in list_proc.stdout.splitlines() if line.strip()]
+    for container_id in container_ids:
+        subprocess.run(["docker", "kill", container_id], check=False, capture_output=True, text=True)
+    return container_ids
+
+
+def _revoke_run_tasks(run_id: uuid.UUID) -> list[str]:
+    revoked: list[str] = []
+    run_id_str = str(run_id)
+    inspect_client = celery_app.control.inspect()
+    for bucket in (inspect_client.active() or {}, inspect_client.reserved() or {}):
+        for tasks in bucket.values():
+            for task in tasks:
+                task_id = task.get("id")
+                args_repr = task.get("argsrepr", "")
+                if task_id and run_id_str in str(args_repr):
+                    celery_app.control.revoke(task_id, terminate=True)
+                    revoked.append(task_id)
+    return revoked
+
+
+@router.post("/{challenge_id}/runs/{run_id}/cancel", response_model=RunCancelResponse)
+async def cancel_run(
+    challenge_id: uuid.UUID,
+    run_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> RunCancelResponse:
+    run = await session.get(Run, run_id)
+    if run is None or run.challenge_id != challenge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+
+    killed_containers = _kill_active_run_containers(run_id)
+    revoked_task_ids = _revoke_run_tasks(run_id)
+    run.state = RunState.CANCELED
+    run.ended_at = datetime.now(timezone.utc)
+    await session.commit()
+
+    return RunCancelResponse(
+        run_id=run.id,
+        state=run.state,
+        killed_containers=killed_containers,
+        revoked_task_ids=revoked_task_ids,
+    )
