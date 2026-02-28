@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.scoring import ScoringReplayRequest, replay_run_scoring
 from app.db.enums import AgentRole, RunState, SubmissionState
 from app.db.models import Agent, Challenge, CheckpointSnapshot, Run, ScoreEvent, Submission
+from app.orchestrator.reproducibility import REPLAY_SEED_ALGORITHM, derive_run_replay_seed
 from app.scoring.events import compute_score_event_payload_checksum
 from app.scoring.final_score import ActiveWeightsSnapshot, ScoreComponentBounds, ScoreComponents, compose_final_score
 
@@ -216,3 +217,97 @@ async def test_replay_endpoint_returns_404_when_snapshot_missing(session: AsyncS
         )
 
     assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_replay_endpoint_is_deterministic_with_fixed_replay_seed(session: AsyncSession) -> None:
+    run, submission_a = await _seed_run_submission(session)
+    replay_seed = derive_run_replay_seed(run.id)
+    run.config_snapshot = {
+        **run.config_snapshot,
+        "reproducibility": {
+            "seed_algorithm": REPLAY_SEED_ALGORITHM,
+            "run_seed": replay_seed,
+        },
+    }
+    await session.flush()
+
+    agent_b = Agent(run_id=run.id, role=AgentRole.HACKER, name="replay-agent-b")
+    session.add(agent_b)
+    await session.flush()
+    submission_b = Submission(
+        run_id=run.id,
+        agent_id=agent_b.id,
+        state=SubmissionState.PENDING,
+        value_hypothesis="Second replay submission for deterministic ordering.",
+        summary="Submission B for deterministic replay.",
+    )
+    session.add(submission_b)
+    await session.flush()
+
+    checkpoint_id = "checkpoint:deterministic-seed"
+    session.add(
+        CheckpointSnapshot(
+            run_id=run.id,
+            checkpoint_id=checkpoint_id,
+            captured_at=datetime(2026, 2, 28, 0, 10, tzinfo=UTC),
+            active_weights=asdict(ActiveWeightsSnapshot(0.4, 0.3, 0.2, 0.1, 0.2, 0.2, 1.0)),
+            active_policies={},
+        )
+    )
+
+    components = ScoreComponents(
+        quality=0.7,
+        novelty=0.6,
+        feasibility=0.5,
+        criteria=0.4,
+        similarity_penalty=0.1,
+        too_safe_penalty=0.05,
+        non_production_penalty=0.0,
+    )
+    payload = {
+        "components": asdict(components),
+        "weights": asdict(ActiveWeightsSnapshot(0.4, 0.3, 0.2, 0.1, 0.2, 0.2, 1.0)),
+    }
+    session.add_all(
+        [
+            ScoreEvent(
+                submission_id=submission_a.id,
+                checkpoint_id=checkpoint_id,
+                quality_score=components.quality,
+                novelty_score=components.novelty,
+                feasibility_score=components.feasibility,
+                criteria_score=components.criteria,
+                final_score=0.55,
+                payload=payload,
+                payload_checksum=compute_score_event_payload_checksum(payload),
+            ),
+            ScoreEvent(
+                submission_id=submission_b.id,
+                checkpoint_id=checkpoint_id,
+                quality_score=components.quality,
+                novelty_score=components.novelty,
+                feasibility_score=components.feasibility,
+                criteria_score=components.criteria,
+                final_score=0.55,
+                payload=payload,
+                payload_checksum=compute_score_event_payload_checksum(payload),
+            ),
+        ]
+    )
+    await session.commit()
+
+    first = await replay_run_scoring(
+        run.id,
+        payload=ScoringReplayRequest(checkpoint_id=checkpoint_id),
+        session=session,
+    )
+    second = await replay_run_scoring(
+        run.id,
+        payload=ScoringReplayRequest(checkpoint_id=checkpoint_id),
+        session=session,
+    )
+
+    assert first.model_dump() == second.model_dump()
+    assert first.config_snapshot["reproducibility"]["run_seed"] == replay_seed
+    assert first.config_snapshot["reproducibility"]["seed_algorithm"] == REPLAY_SEED_ALGORITHM
