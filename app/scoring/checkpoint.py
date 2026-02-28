@@ -60,6 +60,48 @@ async def _load_latest_score_event(session: AsyncSession, submission_id: uuid.UU
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
+async def _persist_submission_checkpoint_writes_atomic(
+    session: AsyncSession,
+    *,
+    submission_id: uuid.UUID,
+    checkpoint_id: str,
+    quality_score: float,
+    novelty_score: float,
+    feasibility_score: float,
+    criteria_score: float,
+    final_score: float,
+    payload: dict[str, object],
+    anti_gaming_penalty: float,
+    anti_gaming_matched_submission_id: uuid.UUID | None,
+) -> None:
+    async with session.begin_nested():
+        await create_score_event_idempotent(
+            session=session,
+            submission_id=submission_id,
+            checkpoint_id=checkpoint_id,
+            quality_score=quality_score,
+            novelty_score=novelty_score,
+            feasibility_score=feasibility_score,
+            criteria_score=criteria_score,
+            final_score=final_score,
+            payload=payload,
+            idempotency_key=f"checkpoint-score:{checkpoint_id}:{submission_id}",
+        )
+        if anti_gaming_penalty > 0:
+            await create_penalty_event_append_only(
+                session=session,
+                submission_id=submission_id,
+                checkpoint_id=checkpoint_id,
+                source="anti_gaming_detector",
+                penalty_type="template_clone_shallow_mutation",
+                value=anti_gaming_penalty,
+                explanation=(
+                    "submission text shows high overlap with peer submission "
+                    f"{anti_gaming_matched_submission_id}"
+                ),
+            )
+
+
 async def run_checkpoint_scoring_worker(
     session: AsyncSession,
     run_id: uuid.UUID,
@@ -161,8 +203,8 @@ async def run_checkpoint_scoring_worker(
             str(anti_gaming_score.matched_submission_id) if anti_gaming_score.matched_submission_id else None
         )
 
-        await create_score_event_idempotent(
-            session=session,
+        await _persist_submission_checkpoint_writes_atomic(
+            session,
             submission_id=submission.id,
             checkpoint_id=checkpoint_id,
             quality_score=quality_score,
@@ -171,21 +213,10 @@ async def run_checkpoint_scoring_worker(
             criteria_score=criteria_score,
             final_score=breakdown.final_score,
             payload=payload,
-            idempotency_key=f"checkpoint-score:{checkpoint_id}:{submission.id}",
+            anti_gaming_penalty=anti_gaming_score.penalty,
+            anti_gaming_matched_submission_id=anti_gaming_score.matched_submission_id,
         )
-        if anti_gaming_score.penalty > 0:
-            await create_penalty_event_append_only(
-                session=session,
-                submission_id=submission.id,
-                checkpoint_id=checkpoint_id,
-                source="anti_gaming_detector",
-                penalty_type="template_clone_shallow_mutation",
-                value=anti_gaming_score.penalty,
-                explanation=(
-                    "submission text shows high overlap with peer submission "
-                    f"{anti_gaming_score.matched_submission_id}"
-                ),
-            )
+        await session.commit()
         scored_submissions += 1
 
     leaderboard_entries = await materialize_leaderboard(session, run_id)
