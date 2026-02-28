@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import uuid
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.db.models import Challenge, JudgeProfile
+from app.ingest.url_fetch import URLFetchError, fetch_url_content
 
 router = APIRouter(prefix="/challenges", tags=["judging"])
 
@@ -25,6 +27,12 @@ class JudgeProfileInput(BaseModel):
 
 class JudgeProfileRegisterJSONRequest(BaseModel):
     profiles: list[JudgeProfileInput] = Field(min_length=1)
+
+
+class JudgeProfileURLRequest(BaseModel):
+    url: str = Field(min_length=8)
+    timeout_seconds: int = Field(default=10, ge=1, le=30)
+    max_bytes: int = Field(default=1024 * 1024, ge=1024, le=5 * 1024 * 1024)
 
 
 class JudgeProfileResponse(BaseModel):
@@ -154,3 +162,27 @@ async def register_judge_profiles_csv(
 ) -> list[JudgeProfileResponse]:
     profiles = parse_csv_profiles(payload)
     return await persist_profiles(challenge_id, profiles, "csv", session)
+
+
+@router.post(
+    "/{challenge_id}/judge-profiles/url",
+    status_code=status.HTTP_201_CREATED,
+    response_model=list[JudgeProfileResponse],
+)
+async def register_judge_profile_url(
+    challenge_id: uuid.UUID,
+    payload: JudgeProfileURLRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> list[JudgeProfileResponse]:
+    try:
+        content = fetch_url_content(payload.url, timeout_seconds=payload.timeout_seconds, max_bytes=payload.max_bytes)
+    except URLFetchError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url fetch failed: {exc}") from exc
+
+    try:
+        parsed = json.loads(content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"fetched payload is not valid JSON: {exc}") from exc
+
+    profiles = normalize_profiles(parsed)
+    return await persist_profiles(challenge_id, profiles, "url", session)
