@@ -1,4 +1,3 @@
-(A) Implement final score composer combining quality, novelty, feasibility, criteria, and penalties with active weights snapshot +scoring
 (A) Implement forward-only weight application logic selecting latest config with effective_from <= score timestamp +scoring +config
 (A) Implement leaderboard materializer that ranks accepted MVPs by final score and stores deterministic tie-break metadata +leaderboard +scoring
 (A) Implement run completion worker that finalizes pending submissions, applies non-production penalties, and seals run state +run +orchestrator
