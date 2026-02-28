@@ -1,4 +1,3 @@
-(A) Implement subagent DAG persistence with parent-child edge records and cycle prevention validation +db +agents
 (A) Implement artifact upload API storing metadata in Postgres and binary blobs in local object storage adapter +api +artifacts
 (A) Implement artifact type validation supporting web app bundle, CLI package, API service bundle, and notebook file +artifacts +validation
 (A) Implement mandatory submission validator enforcing runnable artifact, short README artifact, and value hypothesis field +submissions +validation
