@@ -100,3 +100,19 @@ def map_complexity_slider_to_allocation(slider_value: float) -> ComplexityAlloca
         exploration_time_share=exploration_time_share,
         refinement_time_share=refinement_time_share,
     )
+
+
+@dataclass(frozen=True)
+class ArtifactSophisticationPolicy:
+    target_sophistication: float
+    tolerance: float
+
+
+def resolve_artifact_sophistication_policy(complexity_slider: float) -> ArtifactSophisticationPolicy:
+    bounded = max(0.0, min(1.0, complexity_slider))
+    target = round(0.35 + (bounded * 0.5), 6)
+    tolerance = round(0.35 - (bounded * 0.15), 6)
+    return ArtifactSophisticationPolicy(
+        target_sophistication=target,
+        tolerance=max(0.1, tolerance),
+    )

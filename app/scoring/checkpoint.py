@@ -5,7 +5,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Artifact, Challenge, Run, ScoreEvent, Submission
@@ -13,6 +13,7 @@ from app.judging.worker import run_judge_scoring_worker
 from app.leaderboard.materializer import materialize_leaderboard
 from app.orchestrator.policy import (
     apply_risk_appetite_novelty_penalty_sensitivity,
+    resolve_artifact_sophistication_policy,
     resolve_novelty_penalty_sensitivity_policy,
 )
 from app.scoring.anti_gaming import detect_template_clone_penalty
@@ -24,6 +25,7 @@ from app.scoring.novelty_normalization import normalize_novelty_score
 from app.scoring.penalty_events import create_penalty_event_append_only
 from app.scoring.quality import score_submission_quality
 from app.scoring.similarity import score_submission_similarity
+from app.scoring.sophistication import evaluate_artifact_sophistication_rubric
 from app.scoring.threshold import apply_quality_threshold_gate
 from app.scoring.too_safe import score_too_safe_penalty
 from app.scoring.weights import resolve_active_weights_snapshot
@@ -125,6 +127,7 @@ async def run_checkpoint_scoring_worker(
     active_weights_snapshot = await resolve_active_weights_snapshot(session, run_id, now)
     active_weights = asdict(active_weights_snapshot)
     novelty_policy = resolve_novelty_penalty_sensitivity_policy(challenge.risk_appetite)
+    sophistication_policy = resolve_artifact_sophistication_policy(challenge.complexity_slider)
     active_policies: dict[str, object] = {
         "risk_appetite": challenge.risk_appetite,
         "complexity_slider": challenge.complexity_slider,
@@ -132,6 +135,8 @@ async def run_checkpoint_scoring_worker(
         "novelty_similarity_threshold": novelty_policy.similarity_threshold,
         "novelty_too_safe_threshold": novelty_policy.too_safe_threshold,
         "novelty_penalty_sensitivity_multiplier": novelty_policy.sensitivity_multiplier,
+        "artifact_sophistication_target": sophistication_policy.target_sophistication,
+        "artifact_sophistication_tolerance": sophistication_policy.tolerance,
     }
     effective_config_checksum = _build_effective_config_checksum(active_weights, active_policies)
     await capture_checkpoint_snapshot(
@@ -170,14 +175,17 @@ async def run_checkpoint_scoring_worker(
 
     scored_submissions = 0
     for submission in submissions_to_score:
-        artifact_count_stmt: Select[tuple[int]] = (
-            select(func.count()).select_from(Artifact).where(Artifact.submission_id == submission.id)
-        )
-        artifact_count = (await session.execute(artifact_count_stmt)).scalar_one()
+        artifact_stmt: Select[tuple[Artifact]] = select(Artifact).where(Artifact.submission_id == submission.id)
+        artifacts = (await session.execute(artifact_stmt)).scalars().all()
+        artifact_count = len(artifacts)
         quality_score = await score_submission_quality(session, submission.id, checkpoint_id=checkpoint_id)
         similarity_score = await score_submission_similarity(session, submission.id)
         anti_gaming_score = await detect_template_clone_penalty(session, submission.id)
         too_safe_score = await score_too_safe_penalty(session, submission.id)
+        sophistication_rubric = evaluate_artifact_sophistication_rubric(
+            artifact_types=[artifact.artifact_type for artifact in artifacts],
+            complexity_slider=challenge.complexity_slider,
+        )
         novelty_score = normalize_novelty_score(1.0 - similarity_score.max_similarity)
         combined_similarity_penalty = max(similarity_score.max_similarity, anti_gaming_score.penalty)
         adjusted_similarity_penalty, adjusted_too_safe_penalty, applied_novelty_policy = (
@@ -196,7 +204,7 @@ async def run_checkpoint_scoring_worker(
             ],
             dependency_resolution_log="",
         )
-        criteria_score = quality_score
+        criteria_score = round((quality_score * 0.7) + (sophistication_rubric.rubric_score * 0.3), 6)
         quality_gate_passed = await apply_quality_threshold_gate(session, submission.id, quality_score)
 
         components = ScoreComponents(
@@ -223,6 +231,13 @@ async def run_checkpoint_scoring_worker(
             "similarity_threshold": applied_novelty_policy.similarity_threshold,
             "too_safe_threshold": applied_novelty_policy.too_safe_threshold,
             "sensitivity_multiplier": applied_novelty_policy.sensitivity_multiplier,
+        }
+        payload["artifact_sophistication"] = {
+            "rubric_score": sophistication_rubric.rubric_score,
+            "actual_sophistication": sophistication_rubric.actual_sophistication,
+            "expected_sophistication": sophistication_rubric.expected_sophistication,
+            "tolerance": sophistication_rubric.tolerance,
+            "complexity_slider": challenge.complexity_slider,
         }
 
         await _persist_submission_checkpoint_writes_atomic(
