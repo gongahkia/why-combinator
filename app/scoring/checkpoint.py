@@ -23,8 +23,10 @@ from app.scoring.events import create_score_event_idempotent
 from app.scoring.feasibility import RuntimeValidationSignal, score_feasibility
 from app.scoring.final_score import ScoreComponents, compose_final_score, load_score_component_bounds
 from app.scoring.novelty_normalization import normalize_novelty_score
+from app.scoring.novelty_strategy import resolve_novelty_strategy_mode, select_similarity_penalty
 from app.scoring.penalty_events import create_penalty_event_append_only
 from app.scoring.quality import score_submission_quality
+from app.scoring.artifact_overlap import score_artifact_overlap
 from app.scoring.similarity import score_submission_similarity
 from app.scoring.sophistication import evaluate_artifact_sophistication_rubric
 from app.scoring.threshold import apply_quality_threshold_gate
@@ -126,7 +128,9 @@ async def run_checkpoint_scoring_worker(
         raise ValueError("challenge not found")
 
     active_weights_snapshot = await resolve_active_weights_snapshot(session, run_id, now)
-    artifact_storage_root = load_settings().artifact_storage_path
+    settings = load_settings()
+    artifact_storage_root = settings.artifact_storage_path
+    novelty_strategy_mode = resolve_novelty_strategy_mode(getattr(settings, "novelty_strategy_mode", "embedding_only"))
     active_weights = asdict(active_weights_snapshot)
     score_component_bounds = load_score_component_bounds()
     novelty_policy = resolve_novelty_penalty_sensitivity_policy(challenge.risk_appetite)
@@ -138,6 +142,7 @@ async def run_checkpoint_scoring_worker(
         "novelty_similarity_threshold": novelty_policy.similarity_threshold,
         "novelty_too_safe_threshold": novelty_policy.too_safe_threshold,
         "novelty_penalty_sensitivity_multiplier": novelty_policy.sensitivity_multiplier,
+        "novelty_strategy_mode": novelty_strategy_mode,
         "artifact_sophistication_target": sophistication_policy.target_sophistication,
         "artifact_sophistication_tolerance": sophistication_policy.tolerance,
         "score_component_bounds": asdict(score_component_bounds),
@@ -184,6 +189,14 @@ async def run_checkpoint_scoring_worker(
         artifact_count = len(artifacts)
         quality_score = await score_submission_quality(session, submission.id, checkpoint_id=checkpoint_id)
         similarity_score = await score_submission_similarity(session, submission.id)
+        artifact_overlap_penalty = 0.0
+        if novelty_strategy_mode == "hybrid_overlap":
+            artifact_overlap_score = await score_artifact_overlap(
+                session,
+                submission.id,
+                storage_root=artifact_storage_root,
+            )
+            artifact_overlap_penalty = artifact_overlap_score.max_overlap
         anti_gaming_score = await detect_template_clone_penalty(
             session,
             submission.id,
@@ -195,7 +208,12 @@ async def run_checkpoint_scoring_worker(
             complexity_slider=challenge.complexity_slider,
         )
         novelty_score = normalize_novelty_score(1.0 - similarity_score.max_similarity)
-        combined_similarity_penalty = max(similarity_score.max_similarity, anti_gaming_score.penalty)
+        novelty_strategy_similarity_penalty = select_similarity_penalty(
+            novelty_strategy_mode,
+            embedding_similarity_penalty=similarity_score.max_similarity,
+            artifact_overlap_penalty=artifact_overlap_penalty,
+        )
+        combined_similarity_penalty = max(novelty_strategy_similarity_penalty, anti_gaming_score.penalty)
         adjusted_similarity_penalty, adjusted_too_safe_penalty, applied_novelty_policy = (
             apply_risk_appetite_novelty_penalty_sensitivity(
                 challenge.risk_appetite,
@@ -233,6 +251,9 @@ async def run_checkpoint_scoring_worker(
         payload["anti_gaming_matched_submission_id"] = (
             str(anti_gaming_score.matched_submission_id) if anti_gaming_score.matched_submission_id else None
         )
+        payload["raw_embedding_similarity_penalty"] = similarity_score.max_similarity
+        payload["raw_artifact_overlap_penalty"] = artifact_overlap_penalty
+        payload["novelty_strategy_mode"] = novelty_strategy_mode
         payload["raw_similarity_penalty"] = combined_similarity_penalty
         payload["raw_too_safe_penalty"] = too_safe_score.too_safe_penalty
         payload["novelty_policy"] = {
