@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 from app.api.artifacts import router as artifacts_router
+from app.api.analytics import router as analytics_router
 from app.api.auth import AuthMiddleware
 from app.api.challenge_keys import router as challenge_keys_router
 from app.api.challenges import router as challenges_router
@@ -59,6 +60,7 @@ app.include_router(judges_router)
 app.include_router(runs_router)
 app.include_router(scoring_router)
 app.include_router(artifacts_router)
+app.include_router(analytics_router)
 app.include_router(leaderboard_router)
 app.include_router(mvps_router)
 app.include_router(timeline_router)

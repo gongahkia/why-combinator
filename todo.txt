@@ -1,4 +1,3 @@
-(A) Implement API endpoint to retrieve per-agent productivity metrics including attempts, accepted MVPs, and penalties +api +analytics
 (A) Implement API endpoint to retrieve per-judge disagreement metrics and inter-judge variance per checkpoint +api +analytics
 (A) Implement inter-judge variance penalty dampener preventing outlier judge from dominating final score +scoring +judging
 (A) Implement configurable score component caps and floors to prevent runaway penalty dominance +scoring +validation
