@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.enums import SubmissionState
 from app.db.models import Run, Submission
+from app.validation.submission_state_machine import apply_submission_state_transition
 
 
 async def apply_quality_threshold_gate(
@@ -27,11 +28,8 @@ async def apply_quality_threshold_gate(
 
     threshold = submission.run.challenge.minimum_quality_threshold
     is_accepted = quality_score >= threshold
-    if is_accepted:
-        submission.state = SubmissionState.ACCEPTED
-        submission.accepted_at = datetime.now(UTC)
-    else:
-        submission.state = SubmissionState.REJECTED
-        submission.accepted_at = None
+    apply_submission_state_transition(submission, target_state=SubmissionState.SCORED, now=datetime.now(UTC))
+    target_state = SubmissionState.ACCEPTED if is_accepted else SubmissionState.REJECTED
+    apply_submission_state_transition(submission, target_state=target_state, now=datetime.now(UTC))
     await session.flush()
     return is_accepted

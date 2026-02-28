@@ -1,4 +1,3 @@
-(A) Implement submission state machine with legal transitions and rejection of invalid transition requests +submissions +validation
 (A) Implement run state machine with legal transitions for created, running, canceling, completed, canceled, failed +run +validation
 (A) Implement automatic stale run failure transition when no worker heartbeat updates within configured interval +run +reliability
 (A) Implement API endpoint to retrieve per-agent productivity metrics including attempts, accepted MVPs, and penalties +api +analytics

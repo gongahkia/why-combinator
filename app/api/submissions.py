@@ -19,13 +19,17 @@ from app.db.idempotency import (
     store_idempotent_response,
 )
 from app.db.models import Agent, Run, Submission
-from app.db.enums import ArtifactType
+from app.db.enums import ArtifactType, SubmissionState
 from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.queue.jobs import enqueue_submission_score_job
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
+from app.validation.submission_state_machine import (
+    SubmissionStateTransitionError,
+    apply_submission_state_transition,
+)
 
 router = APIRouter(prefix="/runs", tags=["submissions"])
 
@@ -77,6 +81,10 @@ class RepositorySubmissionSourceResponse(BaseModel):
     artifact_id: uuid.UUID
     resolved_commit: str
     ingestion_job: dict[str, str]
+
+
+class SubmissionStateTransitionRequest(BaseModel):
+    state: SubmissionState
 
 
 @router.post("/{run_id}/submissions", status_code=status.HTTP_201_CREATED, response_model=SubmissionResponse)
@@ -276,3 +284,27 @@ async def attach_repository_submission_source(
         resolved_commit=checkout.commit,
         ingestion_job=ingestion_job,
     )
+
+
+@router.post(
+    "/{run_id}/submissions/{submission_id}/state",
+    response_model=SubmissionResponse,
+)
+async def transition_submission_state(
+    run_id: uuid.UUID,
+    submission_id: uuid.UUID,
+    payload: SubmissionStateTransitionRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> SubmissionResponse:
+    submission = await session.get(Submission, submission_id)
+    if submission is None or submission.run_id != run_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submission not found")
+
+    try:
+        apply_submission_state_transition(submission, payload.state)
+    except SubmissionStateTransitionError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    await session.commit()
+    await session.refresh(submission)
+    return SubmissionResponse.model_validate(submission, from_attributes=True)

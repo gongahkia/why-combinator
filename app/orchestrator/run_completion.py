@@ -11,6 +11,7 @@ from app.db.models import Agent, Challenge, Run, Submission
 from app.leaderboard.materializer import materialize_leaderboard
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.scoring.penalties import generate_non_production_penalties
+from app.validation.submission_state_machine import apply_submission_state_transition
 
 
 async def complete_run(session: AsyncSession, run_id: uuid.UUID) -> dict[str, int]:
@@ -58,7 +59,7 @@ async def complete_run(session: AsyncSession, run_id: uuid.UUID) -> dict[str, in
     )
     pending_submissions = (await session.execute(pending_stmt)).scalars().all()
     for submission in pending_submissions:
-        submission.state = SubmissionState.REJECTED
+        apply_submission_state_transition(submission, SubmissionState.REJECTED)
 
     penalty_events = await generate_non_production_penalties(session, run_id, checkpoint_id="run_end")
     leaderboard_entries = await materialize_leaderboard(session, run_id)
