@@ -7,6 +7,7 @@ import shlex
 import uuid
 from dataclasses import asdict, dataclass
 
+import redis.asyncio as redis_async
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import load_settings
@@ -175,6 +176,36 @@ def run_outbox_relay_job(trace_id: str | None = None, batch_size: int | None = N
     details = asyncio.run(_run())
     return {
         "job_type": "outbox-relay",
+        "status": "completed",
+        "trace_id": trace_id or "",
+        **details,
+    }
+
+
+def run_scheduler_heartbeat_monitor_job(trace_id: str | None = None) -> dict[str, str]:
+    async def _run() -> dict[str, str]:
+        from app.scheduler.heartbeat import monitor_scheduler_heartbeat_and_trigger_failover
+
+        settings = load_settings()
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        redis_client = redis_async.from_url(settings.redis_url, decode_responses=True)
+        try:
+            async with session_factory() as session:
+                result = await monitor_scheduler_heartbeat_and_trigger_failover(session, redis_client)
+                await session.commit()
+        finally:
+            await redis_client.aclose()
+            await engine.dispose()
+        return {
+            "failover_triggered": "true" if result.failover_triggered else "false",
+            "reason": result.reason,
+            "scheduled_runs": str(len(result.scheduled_run_ids)),
+        }
+
+    details = asyncio.run(_run())
+    return {
+        "job_type": "scheduler-heartbeat-monitor",
         "status": "completed",
         "trace_id": trace_id or "",
         **details,

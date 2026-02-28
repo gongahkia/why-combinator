@@ -1,4 +1,3 @@
-(A) Implement scheduler heartbeat monitor that triggers leader election failover for checkpoint dispatch +scheduler +reliability
 (A) Implement Redis-based leader election lock for singleton scheduler duties +scheduler +queue
 (A) Implement policy engine for risk appetite that adjusts novelty penalty sensitivity thresholds dynamically +policy +scoring
 (A) Implement policy engine for complexity slider that scales expected artifact sophistication rubric +policy +scoring

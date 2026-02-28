@@ -20,6 +20,7 @@ from app.orchestrator.jobs import (
     run_hacker_job,
     run_judge_job,
     run_outbox_relay_job,
+    run_scheduler_heartbeat_monitor_job,
 )
 from app.queue.checkpoint_backfill import (
     clear_failed_checkpoint_backfill,
@@ -475,6 +476,18 @@ def backfill_failed_checkpoints(self, trace_id: str | None = None) -> dict[str, 
 def relay_outbox_events(self, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
     return run_outbox_relay_job(trace_id=effective_trace_id)
+
+
+@shared_task(
+    name="app.queue.jobs.scheduler_heartbeat_monitor",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def scheduler_heartbeat_monitor(self, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
+    return run_scheduler_heartbeat_monitor_job(trace_id=effective_trace_id)
 
 
 @shared_task(
