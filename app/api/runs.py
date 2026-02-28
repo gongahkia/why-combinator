@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-import json
 import subprocess
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session
 from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
+from app.events.bus import emit_run_event, make_run_lifecycle_event
 from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 from app.queue.celery_app import celery_app
@@ -96,16 +96,18 @@ async def start_run(
     budget_key = f"run:{run.id}:budget_remaining"
     await request.app.state.redis.setnx(budget_key, request.app.state.settings.default_run_budget_units)
 
-    event = {
-        "event_type": "run_started",
-        "occurred_at": started_at.isoformat(),
-        "run_id": str(run.id),
-        "challenge_id": str(challenge_id),
-        "config_snapshot": config_snapshot,
-        "baseline_vector_count": len(baseline_rows),
-        "budget_key": budget_key,
-    }
-    await request.app.state.redis.publish("run_events", json.dumps(event))
+    event = make_run_lifecycle_event(
+        event_type="run_started",
+        run_id=run.id,
+        challenge_id=challenge_id,
+        payload={
+            "config_snapshot": config_snapshot,
+            "baseline_vector_count": len(baseline_rows),
+            "budget_key": budget_key,
+            "started_at": started_at.isoformat(),
+        },
+    )
+    await emit_run_event(request.app.state.redis, event)
 
     return RunResponse.model_validate(run, from_attributes=True)
 
