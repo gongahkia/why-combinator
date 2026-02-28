@@ -5,7 +5,12 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.realtime import compute_leaderboard_deltas, fetch_realtime_run_state
+from app.api.realtime import (
+    build_realtime_stream_payload,
+    compute_leaderboard_deltas,
+    fetch_realtime_run_state,
+    format_sse_event,
+)
 from app.db.enums import AgentRole, RunState, SubmissionState
 from app.db.models import Agent, Challenge, CheckpointSnapshot, LeaderboardEntry, Run, Submission
 
@@ -117,3 +122,27 @@ async def test_fetch_realtime_run_state_returns_latest_checkpoint_and_limited_le
     assert checkpoint["checkpoint_id"] == "checkpoint:new"
     assert len(state["leaderboard"]) == 1
     assert state["leaderboard"][0]["rank"] == 1
+
+
+@pytest.mark.asyncio
+async def test_build_realtime_payload_and_sse_format() -> None:
+    state = {
+        "run_id": "run-1",
+        "generated_at": "2026-02-28T00:00:00+00:00",
+        "checkpoint": None,
+        "leaderboard": [
+            {"rank": 1, "submission_id": "submission-a", "final_score": 0.9, "tie_break_metadata": {}},
+            {"rank": 2, "submission_id": "submission-b", "final_score": 0.8, "tie_break_metadata": {}},
+        ],
+    }
+    previous_index = {"submission-a": (1, 0.7)}
+
+    payload, current_index = build_realtime_stream_payload(state, previous_index)
+    frame = format_sse_event("checkpoint_update", payload)
+
+    assert payload["event"] == "checkpoint_update"
+    assert len(payload["leaderboard_deltas"]) == 2
+    assert current_index["submission-a"] == (1, 0.9)
+    assert current_index["submission-b"] == (2, 0.8)
+    assert frame.startswith("event: checkpoint_update\\ndata: {")
+    assert frame.endswith("\\n\\n")

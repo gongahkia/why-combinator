@@ -1,4 +1,3 @@
-(B) Implement SSE fallback endpoint for checkpoint progress when websocket transport is unavailable +api +realtime
 (B) Implement typed client SDK generation step from OpenAPI schema and publishable package output +api +sdk
 (B) Implement background cleanup worker deleting expired sandbox volumes and temporary workdirs +sandbox +maintenance
 (B) Implement artifact retention policy engine with per-challenge TTL overrides +artifacts +storage

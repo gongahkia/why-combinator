@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import Select, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -105,6 +108,26 @@ def compute_leaderboard_deltas(
     return deltas
 
 
+def build_realtime_stream_payload(
+    state: dict[str, object],
+    previous_index: dict[str, tuple[int, float]],
+) -> tuple[dict[str, object], dict[str, tuple[int, float]]]:
+    leaderboard_rows = state["leaderboard"] if isinstance(state.get("leaderboard"), list) else []
+    deltas = compute_leaderboard_deltas(previous_index, leaderboard_rows)
+    current_index = _build_leaderboard_index(leaderboard_rows)
+    payload = {
+        "event": "checkpoint_update",
+        **state,
+        "leaderboard_deltas": deltas,
+    }
+    return payload, current_index
+
+
+def format_sse_event(event: str, data: dict[str, object]) -> str:
+    encoded = json.dumps(data, separators=(",", ":"), default=str)
+    return f"event: {event}\\ndata: {encoded}\\n\\n"
+
+
 async def fetch_realtime_run_state(
     session: AsyncSession,
     run_id: uuid.UUID,
@@ -184,17 +207,37 @@ async def stream_run_realtime_updates(websocket: WebSocket, run_id: str) -> None
                     await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                     return
 
-            leaderboard_rows = state["leaderboard"] if isinstance(state.get("leaderboard"), list) else []
-            deltas = compute_leaderboard_deltas(previous_index, leaderboard_rows)
-            previous_index = _build_leaderboard_index(leaderboard_rows)
+            payload, previous_index = build_realtime_stream_payload(state, previous_index)
 
-            await websocket.send_json(
-                {
-                    "event": "checkpoint_update",
-                    **state,
-                    "leaderboard_deltas": deltas,
-                }
-            )
+            await websocket.send_json(payload)
             await asyncio.sleep(interval_seconds)
     except WebSocketDisconnect:
         return
+
+
+@router.get("/{run_id}/realtime/sse")
+async def stream_run_realtime_updates_sse(
+    run_id: uuid.UUID,
+    request: Request,
+) -> StreamingResponse:
+    session_factory: async_sessionmaker[AsyncSession] = request.app.state.db_session_factory
+    max_entries = load_realtime_stream_max_entries()
+    interval_seconds = load_realtime_stream_interval_seconds()
+
+    async with session_factory() as session:
+        run = await session.get(Run, run_id)
+        if run is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+
+    async def _stream() -> AsyncIterator[str]:
+        previous_index: dict[str, tuple[int, float]] = {}
+        while True:
+            if await request.is_disconnected():
+                break
+            async with session_factory() as session:
+                state = await fetch_realtime_run_state(session, run_id, max_entries=max_entries)
+            payload, previous_index = build_realtime_stream_payload(state, previous_index)
+            yield format_sse_event("checkpoint_update", payload)
+            await asyncio.sleep(interval_seconds)
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
