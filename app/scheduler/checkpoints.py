@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.enums import RunState
-from app.db.models import Run
+from app.db.models import CheckpointSnapshot, Run
 from app.observability.trace import new_trace_id
 from app.queue.jobs import checkpoint_score
 
@@ -43,6 +43,31 @@ def _weighted_fair_due_order(runs: list[Run]) -> list[Run]:
     return ordered
 
 
+def _ensure_utc_timestamp(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
+async def _resolve_resume_checkpoint_at(
+    session: AsyncSession,
+    run: Run,
+    interval: timedelta,
+) -> datetime | None:
+    if run.started_at is None:
+        return None
+    snapshot_stmt: Select[tuple[datetime]] = (
+        select(CheckpointSnapshot.captured_at)
+        .where(CheckpointSnapshot.run_id == run.id)
+        .order_by(CheckpointSnapshot.captured_at.desc())
+        .limit(1)
+    )
+    latest_checkpoint_at = (await session.execute(snapshot_stmt)).scalar_one_or_none()
+    if latest_checkpoint_at is None:
+        return _ensure_utc_timestamp(run.started_at)
+    return _ensure_utc_timestamp(latest_checkpoint_at) + interval
+
+
 async def enqueue_periodic_checkpoint_scores(
     session: AsyncSession,
     redis_client: Redis,
@@ -72,9 +97,12 @@ async def enqueue_periodic_checkpoint_scores(
         key = f"run:{run.id}:next_checkpoint_at"
         next_checkpoint_raw = await redis_client.get(key)
         if next_checkpoint_raw is None:
-            next_checkpoint = run.started_at
+            next_checkpoint = await _resolve_resume_checkpoint_at(session, run, interval)
+            if next_checkpoint is None:
+                continue
+            await redis_client.set(key, next_checkpoint.isoformat())
         else:
-            next_checkpoint = datetime.fromisoformat(next_checkpoint_raw)
+            next_checkpoint = _ensure_utc_timestamp(datetime.fromisoformat(next_checkpoint_raw))
 
         if current_time < next_checkpoint:
             continue

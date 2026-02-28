@@ -1,4 +1,3 @@
-(A) Implement partial run resume workflow to restart from last completed checkpoint after orchestrator crash +run +reliability
 (A) Implement checkpoint transactional boundary ensuring score and penalty writes commit atomically per submission +db +scoring
 (A) Implement outbox table and relay worker for exactly-once event publication to internal event bus +events +reliability
 (A) Implement scheduler heartbeat monitor that triggers leader election failover for checkpoint dispatch +scheduler +reliability
