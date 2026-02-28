@@ -85,13 +85,10 @@ async def run_checkpoint_scoring_worker(session: AsyncSession, run_id: uuid.UUID
         active_policies=active_policies,
     )
 
-    judge_scores_created = await run_judge_scoring_worker(session, run_id, checkpoint_id=checkpoint_id)
-
     submission_stmt: Select[tuple[Submission]] = select(Submission).where(Submission.run_id == run_id)
     submissions = (await session.execute(submission_stmt)).scalars().all()
-    scored_submissions = 0
+    submissions_to_score: list[Submission] = []
     skipped_submissions = 0
-
     for submission in submissions:
         latest_event = await _load_latest_score_event(session, submission.id)
         latest_checksum = ""
@@ -102,9 +99,21 @@ async def run_checkpoint_scoring_worker(session: AsyncSession, run_id: uuid.UUID
         if latest_checksum == effective_config_checksum:
             skipped_submissions += 1
             continue
+        submissions_to_score.append(submission)
 
-        artifact_count_stmt: Select[tuple[int]] = select(func.count()).select_from(Artifact).where(
-            Artifact.submission_id == submission.id
+    judge_scores_created = 0
+    if submissions_to_score:
+        judge_scores_created = await run_judge_scoring_worker(
+            session,
+            run_id,
+            checkpoint_id=checkpoint_id,
+            submission_ids={submission.id for submission in submissions_to_score},
+        )
+
+    scored_submissions = 0
+    for submission in submissions_to_score:
+        artifact_count_stmt: Select[tuple[int]] = (
+            select(func.count()).select_from(Artifact).where(Artifact.submission_id == submission.id)
         )
         artifact_count = (await session.execute(artifact_count_stmt)).scalar_one()
         quality_score = await score_submission_quality(session, submission.id, checkpoint_id=checkpoint_id)

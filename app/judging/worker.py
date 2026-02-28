@@ -59,6 +59,7 @@ async def run_judge_scoring_worker(
     session: AsyncSession,
     run_id: uuid.UUID,
     checkpoint_id: str = "checkpoint",
+    submission_ids: set[uuid.UUID] | None = None,
 ) -> int:
     run_stmt: Select[tuple[Run]] = (
         select(Run)
@@ -73,6 +74,8 @@ async def run_judge_scoring_worker(
     submissions = run.submissions
     created = 0
     for submission in submissions:
+        if submission_ids is not None and submission.id not in submission_ids:
+            continue
         for judge_profile in judge_profiles:
             exists_stmt: Select[tuple[int]] = select(func.count()).select_from(JudgeScore).where(
                 and_(
