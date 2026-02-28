@@ -20,6 +20,7 @@ from app.orchestrator.admission import evaluate_run_admission_capacity
 from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incomplete
 from app.orchestrator.run_validation import RunStartValidationError, validate_domain_expert_judge_present
 from app.queue.celery_app import celery_app
+from app.security.prompt_safety import PromptSafetyError, validate_challenge_prompt_safety
 
 router = APIRouter(prefix="/challenges", tags=["runs"])
 
@@ -61,6 +62,10 @@ async def start_run(
     challenge = await session.get(Challenge, challenge_id)
     if challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+    try:
+        validate_challenge_prompt_safety(challenge.prompt)
+    except PromptSafetyError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
     admission = evaluate_run_admission_capacity(celery_app.control.inspect(timeout=1.0))
     if not admission.allowed:

@@ -1,4 +1,3 @@
-(A) Implement challenge prompt safety filter that rejects disallowed execution intents before run creation +security +challenge
 (A) Implement strict JSON schema validation for model responses from hacker and judge agents +agents +validation
 (A) Implement judge response repair pipeline that retries malformed structured outputs with constrained re-prompt +judging +agents
 (A) Implement fallback judge execution path when one judge agent fails to return score within checkpoint SLA +judging +reliability
