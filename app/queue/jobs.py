@@ -14,9 +14,13 @@ from app.queue.dead_letter import persist_dead_letter_event
 from app.queue.dedup import claim_score_job_dedup_key
 from app.queue.recovery import (
     clear_in_flight_task,
+    detect_orphaned_in_flight_tasks,
     list_in_flight_tasks,
+    list_recoverable_tasks,
+    load_orphan_stale_threshold_seconds,
     load_worker_drain_timeout_seconds,
     mark_recoverable_task,
+    remove_recoverable_task,
     track_in_flight_task,
 )
 
@@ -36,7 +40,13 @@ def _normalize_jsonable(value: Any) -> Any:
     return str(value)
 
 
-def _track_task_started(task_id: str, task_name: str, args: tuple[Any, ...], kwargs: dict[str, Any]) -> None:
+def _track_task_started(
+    task_id: str,
+    task_name: str,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    worker_hostname: str | None,
+) -> None:
     with _ACTIVE_TASK_IDS_LOCK:
         _ACTIVE_TASK_IDS.add(task_id)
     redis_client = create_redis_client()
@@ -48,7 +58,7 @@ def _track_task_started(task_id: str, task_name: str, args: tuple[Any, ...], kwa
             args=_normalize_jsonable(list(args)),
             kwargs=_normalize_jsonable(kwargs),
             worker_pid=os.getpid(),
-            worker_hostname=os.getenv("HOSTNAME"),
+            worker_hostname=worker_hostname or os.getenv("HOSTNAME"),
         )
     finally:
         redis_client.close()
@@ -80,7 +90,9 @@ def _on_task_prerun(
     task_name = str(getattr(task, "name", ""))
     if not task_name.startswith("app.queue.jobs."):
         return
-    _track_task_started(task_id, task_name, args or (), kwargs or {})
+    request_obj = getattr(task, "request", None)
+    worker_hostname = str(getattr(request_obj, "hostname", "")) if request_obj is not None else None
+    _track_task_started(task_id, task_name, args or (), kwargs or {}, worker_hostname)
 
 
 @signals.task_postrun.connect
@@ -127,6 +139,59 @@ def _on_worker_shutting_down(**_: Any) -> None:
             )
     finally:
         redis_client.close()
+
+
+def _coerce_task_args(payload: dict[str, Any]) -> tuple[list[Any], dict[str, Any]]:
+    args = payload.get("args", [])
+    kwargs = payload.get("kwargs", {})
+    if not isinstance(args, list):
+        args = []
+    if not isinstance(kwargs, dict):
+        kwargs = {}
+    return args, kwargs
+
+
+@shared_task(
+    name="app.queue.jobs.recover_orphaned_tasks",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def recover_orphaned_tasks(self) -> dict[str, str]:
+    redis_client = create_redis_client()
+    inspect_client = self.app.control.inspect(timeout=1.0)
+    active_workers = set((inspect_client.ping() or {}).keys())
+    stale_threshold = load_orphan_stale_threshold_seconds()
+    orphaned = []
+    recovered = 0
+    try:
+        orphaned = detect_orphaned_in_flight_tasks(
+            redis_client,
+            active_worker_hostnames=active_workers,
+            stale_threshold_seconds=stale_threshold,
+        )
+        for payload in orphaned:
+            mark_recoverable_task(redis_client, task_payload=payload, reason="worker_crash_detected")
+
+        for recoverable in list_recoverable_tasks(redis_client):
+            task_name = str(recoverable.get("task_name", ""))
+            task_id = str(recoverable.get("task_id", ""))
+            if not task_name or not task_id or task_name == "app.queue.jobs.recover_orphaned_tasks":
+                continue
+            args, kwargs = _coerce_task_args(recoverable)
+            self.app.send_task(task_name, args=args, kwargs=kwargs)
+            remove_recoverable_task(redis_client, task_id)
+            recovered += 1
+    finally:
+        redis_client.close()
+
+    return {
+        "job_type": "recover-orphaned",
+        "status": "completed",
+        "orphaned_detected": str(len(orphaned)),
+        "requeued": str(recovered),
+    }
 
 
 def _with_budget_guard(run_id: str, task_name: str, default_cost: int) -> tuple[bool, dict[str, str]]:

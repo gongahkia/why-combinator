@@ -15,6 +15,10 @@ def load_worker_drain_timeout_seconds() -> int:
     return int(os.getenv("WORKER_DRAIN_TIMEOUT_SECONDS", "15"))
 
 
+def load_orphan_stale_threshold_seconds() -> int:
+    return int(os.getenv("ORPHAN_TASK_STALE_SECONDS", "90"))
+
+
 def _json_dumps(payload: dict[str, Any]) -> str:
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
 
@@ -94,3 +98,27 @@ def list_recoverable_tasks(redis_client: redis.Redis) -> list[dict[str, Any]]:
 
 def remove_recoverable_task(redis_client: redis.Redis, task_id: str) -> None:
     redis_client.hdel(RECOVERABLE_TASKS_KEY, task_id)
+
+
+def detect_orphaned_in_flight_tasks(
+    redis_client: redis.Redis,
+    *,
+    active_worker_hostnames: set[str],
+    stale_threshold_seconds: int,
+) -> list[dict[str, Any]]:
+    now = datetime.now(UTC)
+    orphaned: list[dict[str, Any]] = []
+    for payload in list_in_flight_tasks(redis_client):
+        worker_hostname = str(payload.get("worker_hostname", ""))
+        started_at_raw = str(payload.get("started_at", ""))
+        try:
+            started_at = datetime.fromisoformat(started_at_raw)
+        except ValueError:
+            started_at = now
+        age_seconds = max(0.0, (now - started_at).total_seconds())
+        if age_seconds < stale_threshold_seconds:
+            continue
+        if worker_hostname and worker_hostname in active_worker_hostnames:
+            continue
+        orphaned.append(payload)
+    return orphaned

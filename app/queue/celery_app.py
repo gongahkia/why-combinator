@@ -26,5 +26,6 @@ celery_app.conf.update(
         "app.queue.jobs.checkpoint_score": {"queue": "checkpoint-score"},
         "app.queue.jobs.complete_run": {"queue": "run-complete"},
         "app.queue.jobs.score_submission": {"queue": "score-submission"},
+        "app.queue.jobs.recover_orphaned_tasks": {"queue": "recovery"},
     },
 )
