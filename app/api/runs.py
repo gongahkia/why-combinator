@@ -10,6 +10,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
+from app.api.errors import BUDGET_EXHAUSTED_ERROR, SANDBOX_FAILURE_ERROR, VALIDATION_ERROR
 from app.api.rate_limit import rate_limit_dependency
 from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
@@ -43,6 +44,11 @@ class RunCancelResponse(BaseModel):
     "/{challenge_id}/runs/start",
     status_code=status.HTTP_201_CREATED,
     response_model=RunResponse,
+    responses={
+        422: VALIDATION_ERROR,
+        429: BUDGET_EXHAUSTED_ERROR,
+        503: SANDBOX_FAILURE_ERROR,
+    },
 )
 async def start_run(
     challenge_id: uuid.UUID,

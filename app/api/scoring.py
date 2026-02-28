@@ -9,6 +9,7 @@ from sqlalchemy import Select, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
+from app.api.errors import SCORING_UNAVAILABLE_ERROR, VALIDATION_ERROR
 from app.db.models import Run, ScoringWeightConfig
 
 router = APIRouter(prefix="/runs", tags=["scoring"])
@@ -46,7 +47,15 @@ class ScoringWeightsUpdateResponse(BaseModel):
     updated_at: datetime
 
 
-@router.post("/{run_id}/scoring-weights", status_code=status.HTTP_201_CREATED, response_model=ScoringWeightsUpdateResponse)
+@router.post(
+    "/{run_id}/scoring-weights",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ScoringWeightsUpdateResponse,
+    responses={
+        422: VALIDATION_ERROR,
+        503: SCORING_UNAVAILABLE_ERROR,
+    },
+)
 async def update_scoring_weights(
     run_id: uuid.UUID,
     payload: ScoringWeightsUpdateRequest,
