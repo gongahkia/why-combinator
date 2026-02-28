@@ -1,4 +1,3 @@
-(A) Implement leaderboard materializer that ranks accepted MVPs by final score and stores deterministic tie-break metadata +leaderboard +scoring
 (A) Implement run completion worker that finalizes pending submissions, applies non-production penalties, and seals run state +run +orchestrator
 (A) Implement API endpoint returning leaderboard with score breakdown, active penalties, and judge rationale snippets +api +leaderboard
 (A) Implement API endpoint returning all MVP bundles and artifact download links for accepted submissions +api +artifacts

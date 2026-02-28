@@ -45,6 +45,9 @@ class Run(TimestampMixin, Base):
     baseline_idea_vectors: Mapped[list[BaselineIdeaVector]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
+    leaderboard_entries: Mapped[list[LeaderboardEntry]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
 
 
 class BaselineIdeaVector(TimestampMixin, Base):
@@ -104,6 +107,9 @@ class Submission(TimestampMixin, Base):
     score_events: Mapped[list[ScoreEvent]] = relationship(back_populates="submission", cascade="all, delete-orphan")
     penalty_events: Mapped[list[PenaltyEvent]] = relationship(back_populates="submission", cascade="all, delete-orphan")
     judge_scores: Mapped[list[JudgeScore]] = relationship(back_populates="submission", cascade="all, delete-orphan")
+    leaderboard_entries: Mapped[list[LeaderboardEntry]] = relationship(
+        back_populates="submission", cascade="all, delete-orphan"
+    )
 
 
 class Artifact(TimestampMixin, Base):
@@ -192,3 +198,19 @@ class JudgeScore(TimestampMixin, Base):
 
     submission: Mapped[Submission] = relationship(back_populates="judge_scores")
     judge_profile: Mapped[JudgeProfile] = relationship(back_populates="judge_scores")
+
+
+class LeaderboardEntry(TimestampMixin, Base):
+    __tablename__ = "leaderboard_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    submission_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    rank: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    final_score: Mapped[float] = mapped_column(Float, nullable=False, index=True)
+    tie_break_metadata: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+
+    run: Mapped[Run] = relationship(back_populates="leaderboard_entries")
+    submission: Mapped[Submission] = relationship(back_populates="leaderboard_entries")
