@@ -1,4 +1,3 @@
-(A) Implement API auth middleware for organizer and participant roles with challenge-level authorization checks +auth +api
 (A) Implement per-challenge API keys with hashed storage and rolling key rotation endpoint +auth +security
 (A) Implement rate limiting on challenge mutation and run control endpoints using Redis token buckets +security +api
 (A) Implement Pydantic request/response schemas for all challenge, run, scoring, and artifact endpoints +api +validation
