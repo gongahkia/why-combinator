@@ -16,6 +16,7 @@ from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
 from app.events.bus import make_run_lifecycle_event
 from app.events.outbox import enqueue_run_lifecycle_event_outbox
+from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, resolve_quota_user_id
 from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.admission import evaluate_run_admission_capacity
 from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incomplete
@@ -147,6 +148,11 @@ async def start_run(
         },
     )
     await enqueue_run_lifecycle_event_outbox(session, event)
+    await increment_quota_usage(
+        session,
+        quota_user_id=resolve_quota_user_id(request),
+        delta=QuotaUsageDelta(runs_started=1),
+    )
     await session.commit()
     await session.refresh(run)
     budget_key = f"run:{run.id}:budget_remaining"

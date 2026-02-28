@@ -12,7 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.artifacts.git_checkout import GitCheckoutError, isolated_git_checkout
+from app.artifacts.retention import compute_artifact_expiry
 from app.api.deps import get_db_session
+from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, resolve_quota_user_id
 from app.db.idempotency import (
     get_idempotent_response,
     hash_request_payload,
@@ -24,7 +26,8 @@ from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.queue.jobs import enqueue_submission_score_job
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
-from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
+from app.storage.adapter import build_object_storage_adapter
+from app.storage.local import ArchiveExtractionError, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
 from app.validation.submission_state_machine import (
     SubmissionStateTransitionError,
@@ -154,7 +157,7 @@ async def ingest_submission_transactional(
     if agent is None or agent.run_id != run_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="agent does not belong to run")
 
-    adapter = LocalObjectStorageAdapter(request.app.state.settings.artifact_storage_path)
+    adapter = build_object_storage_adapter(request.app.state.settings.artifact_storage_path)
     decoded_artifacts = [(artifact_input, base64.b64decode(artifact_input.content_base64)) for artifact_input in payload.artifacts]
     try:
         validate_artifact_submission_limits(
@@ -180,6 +183,7 @@ async def ingest_submission_transactional(
         await session.flush()
 
         artifact_ids: list[uuid.UUID] = []
+        ingested_total_bytes = 0
         for artifact_input, content in decoded_artifacts:
             try:
                 validate_archive_members_safe(content, artifact_input.filename)
@@ -201,10 +205,20 @@ async def ingest_submission_transactional(
                 artifact_type=artifact_input.artifact_type,
                 storage_key=storage_key,
                 content_hash=hashlib.sha256(content).hexdigest(),
+                expires_at=compute_artifact_expiry(
+                    challenge_override_seconds=challenge.artifact_ttl_override_seconds,
+                ),
             )
             session.add(artifact)
             await session.flush()
             artifact_ids.append(artifact.id)
+            ingested_total_bytes += len(content)
+
+        await increment_quota_usage(
+            session,
+            quota_user_id=resolve_quota_user_id(request),
+            delta=QuotaUsageDelta(artifact_storage_bytes=ingested_total_bytes),
+        )
 
     await session.refresh(submission)
     return SubmissionIngestResponse(
@@ -266,15 +280,28 @@ async def attach_repository_submission_source(
         storage_key = str(checkout_path.relative_to(root_path))
     except ValueError:
         storage_key = str(checkout_path)
+    repo_storage_bytes = 0
+    if checkout_path.exists():
+        for path in checkout_path.rglob("*"):
+            if path.is_file():
+                repo_storage_bytes += path.stat().st_size
 
     artifact = Artifact(
         submission_id=submission.id,
         artifact_type=ArtifactType.CLI_PACKAGE,
         storage_key=storage_key,
         content_hash=hashlib.sha256(f"{payload.repository_url}@{checkout.commit}".encode("utf-8")).hexdigest(),
+        expires_at=compute_artifact_expiry(
+            challenge_override_seconds=challenge.artifact_ttl_override_seconds,
+        ),
     )
     session.add(artifact)
     await session.flush()
+    await increment_quota_usage(
+        session,
+        quota_user_id=resolve_quota_user_id(request),
+        delta=QuotaUsageDelta(artifact_storage_bytes=repo_storage_bytes),
+    )
     await session.commit()
     await session.refresh(submission)
     ingestion_job = enqueue_submission_score_job(submission.id, "repository_ingest")

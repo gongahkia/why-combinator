@@ -261,6 +261,16 @@ class ChallengeApiKey(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
 
 
+class UserQuotaUsage(TimestampMixin, Base):
+    __tablename__ = "user_quota_usages"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    quota_user_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    challenges_created: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    runs_started: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    artifact_storage_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 class OutboxEvent(TimestampMixin, Base):
     __tablename__ = "outbox_events"
 
