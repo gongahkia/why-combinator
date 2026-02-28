@@ -1,4 +1,3 @@
-(A) Implement execution trace IDs propagated across API, queue, sandbox, and scoring events +observability +infra
 (A) Implement seed script to create local default challenge templates for rapid hackathon run initialization +challenge +api
 (A) Add integration test for forward-only scoring updates proving no retroactive rescore before next checkpoint +tests +scoring
 (A) Add integration test for similarity and too-safe penalty composition against controlled baseline ideas +tests +scoring

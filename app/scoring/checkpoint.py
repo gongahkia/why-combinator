@@ -58,7 +58,11 @@ async def _load_latest_score_event(session: AsyncSession, submission_id: uuid.UU
     return (await session.execute(stmt)).scalar_one_or_none()
 
 
-async def run_checkpoint_scoring_worker(session: AsyncSession, run_id: uuid.UUID) -> CheckpointScoringResult:
+async def run_checkpoint_scoring_worker(
+    session: AsyncSession,
+    run_id: uuid.UUID,
+    trace_id: str | None = None,
+) -> CheckpointScoringResult:
     now = datetime.now(UTC)
     checkpoint_id = _checkpoint_id(now)
 
@@ -108,6 +112,7 @@ async def run_checkpoint_scoring_worker(session: AsyncSession, run_id: uuid.UUID
             run_id,
             checkpoint_id=checkpoint_id,
             submission_ids={submission.id for submission in submissions_to_score},
+            trace_id=trace_id,
         )
 
     scored_submissions = 0
@@ -145,6 +150,7 @@ async def run_checkpoint_scoring_worker(session: AsyncSession, run_id: uuid.UUID
         payload = breakdown.as_payload()
         payload["effective_config_checksum"] = effective_config_checksum
         payload["quality_gate_passed"] = quality_gate_passed
+        payload["trace_id"] = trace_id or ""
 
         await create_score_event_idempotent(
             session=session,

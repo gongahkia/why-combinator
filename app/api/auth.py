@@ -14,7 +14,7 @@ _CHALLENGE_PATH_PATTERN = re.compile(r"^/challenges/([0-9a-fA-F-]{36})(?:/|$)")
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        if request.url.path in {"/", "/docs", "/openapi.json", "/redoc"}:
+        if request.url.path in {"/", "/health", "/readiness", "/docs", "/openapi.json", "/redoc"}:
             return await call_next(request)
 
         role = request.headers.get(ROLE_HEADER, "").strip().lower()

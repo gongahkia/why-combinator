@@ -10,6 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.enums import RunState
 from app.db.models import Run
+from app.observability.trace import new_trace_id
 from app.queue.jobs import checkpoint_score
 
 
@@ -52,7 +53,7 @@ async def enqueue_periodic_checkpoint_scores(
         if current_time < next_checkpoint:
             continue
 
-        checkpoint_score.delay(str(run.id))
+        checkpoint_score.delay(str(run.id), new_trace_id())
         await redis_client.set(key, (current_time + interval).isoformat())
         scheduled_run_ids.append(str(run.id))
 

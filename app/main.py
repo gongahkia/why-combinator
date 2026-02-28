@@ -20,6 +20,7 @@ from app.api.runs import router as runs_router
 from app.api.scoring import router as scoring_router
 from app.api.submissions import router as submissions_router
 from app.api.timeline import router as timeline_router
+from app.api.trace import TraceIdMiddleware
 from app.config import Settings, load_settings
 
 
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="Hackathon Service", lifespan=lifespan)
+app.add_middleware(TraceIdMiddleware)
 app.add_middleware(AuthMiddleware)
 app.include_router(challenges_router)
 app.include_router(challenge_keys_router)

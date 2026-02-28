@@ -8,6 +8,7 @@ from typing import Any
 
 from celery import shared_task, signals
 
+from app.observability.trace import ensure_trace_id
 from app.orchestrator.jobs import run_checkpoint_score_job, run_complete_run_job, run_hacker_job, run_judge_job
 from app.queue.budget import create_redis_client, reserve_budget, task_cost_from_env
 from app.queue.dead_letter import persist_dead_letter_event
@@ -215,32 +216,46 @@ def _checkpoint_run_lock_key(run_id: str) -> str:
 
 
 @shared_task(name="app.queue.jobs.hacker_run", bind=True)
-def hacker_run(self, run_id: str) -> dict[str, str]:
+def hacker_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
     max_retries = 3
     try:
         accepted, payload = _with_budget_guard(run_id, "hacker-run", default_cost=10)
         if not accepted:
-            return payload
-        return run_hacker_job(run_id)
+            return {**payload, "trace_id": effective_trace_id}
+        return run_hacker_job(run_id, trace_id=effective_trace_id)
     except Exception as exc:  # noqa: BLE001
         if self.request.retries >= max_retries:
             persist_dead_letter_event("hacker-run", run_id, str(exc), self.request.retries)
-            return {"job_type": "hacker-run", "run_id": run_id, "status": "dead_lettered", "reason": str(exc)}
+            return {
+                "job_type": "hacker-run",
+                "run_id": run_id,
+                "status": "dead_lettered",
+                "reason": str(exc),
+                "trace_id": effective_trace_id,
+            }
         raise self.retry(exc=exc, countdown=2**self.request.retries, max_retries=max_retries)
 
 
 @shared_task(name="app.queue.jobs.judge_run", bind=True)
-def judge_run(self, run_id: str) -> dict[str, str]:
+def judge_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
     max_retries = 3
     try:
         accepted, payload = _with_budget_guard(run_id, "judge-run", default_cost=5)
         if not accepted:
-            return payload
-        return run_judge_job(run_id)
+            return {**payload, "trace_id": effective_trace_id}
+        return run_judge_job(run_id, trace_id=effective_trace_id)
     except Exception as exc:  # noqa: BLE001
         if self.request.retries >= max_retries:
             persist_dead_letter_event("judge-run", run_id, str(exc), self.request.retries)
-            return {"job_type": "judge-run", "run_id": run_id, "status": "dead_lettered", "reason": str(exc)}
+            return {
+                "job_type": "judge-run",
+                "run_id": run_id,
+                "status": "dead_lettered",
+                "reason": str(exc),
+                "trace_id": effective_trace_id,
+            }
         raise self.retry(exc=exc, countdown=2**self.request.retries, max_retries=max_retries)
 
 
@@ -251,10 +266,11 @@ def judge_run(self, run_id: str) -> dict[str, str]:
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
-def checkpoint_score(self, run_id: str) -> dict[str, str]:
+def checkpoint_score(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
     accepted, payload = _with_budget_guard(run_id, "checkpoint-score", default_cost=2)
     if not accepted:
-        return payload
+        return {**payload, "trace_id": effective_trace_id}
     redis_client = create_redis_client()
     lock = redis_client.lock(_checkpoint_run_lock_key(run_id), timeout=60, blocking=False)
     if not lock.acquire(blocking=False):
@@ -263,9 +279,10 @@ def checkpoint_score(self, run_id: str) -> dict[str, str]:
             "job_type": "checkpoint-score",
             "run_id": run_id,
             "status": "lock_not_acquired",
+            "trace_id": effective_trace_id,
         }
     try:
-        return run_checkpoint_score_job(run_id)
+        return run_checkpoint_score_job(run_id, trace_id=effective_trace_id)
     finally:
         lock.release()
         redis_client.close()
@@ -278,11 +295,17 @@ def checkpoint_score(self, run_id: str) -> dict[str, str]:
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
-def complete_run(self, run_id: str) -> dict[str, str]:
-    return run_complete_run_job(run_id)
+def complete_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
+    return run_complete_run_job(run_id, trace_id=effective_trace_id)
 
 
-def enqueue_submission_score_job(submission_id: uuid.UUID, checkpoint_id: str) -> dict[str, str]:
+def enqueue_submission_score_job(
+    submission_id: uuid.UUID,
+    checkpoint_id: str,
+    trace_id: str | None = None,
+) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
     redis_client = create_redis_client()
     try:
         claimed = claim_score_job_dedup_key(redis_client, submission_id, checkpoint_id)
@@ -294,13 +317,15 @@ def enqueue_submission_score_job(submission_id: uuid.UUID, checkpoint_id: str) -
             "submission_id": str(submission_id),
             "checkpoint_id": checkpoint_id,
             "status": "duplicate_suppressed",
+            "trace_id": effective_trace_id,
         }
-    score_submission.delay(str(submission_id), checkpoint_id)
+    score_submission.delay(str(submission_id), checkpoint_id, effective_trace_id)
     return {
         "job_type": "score-submission",
         "submission_id": str(submission_id),
         "checkpoint_id": checkpoint_id,
         "status": "queued",
+        "trace_id": effective_trace_id,
     }
 
 
@@ -311,10 +336,12 @@ def enqueue_submission_score_job(submission_id: uuid.UUID, checkpoint_id: str) -
     retry_backoff=True,
     retry_kwargs={"max_retries": 3},
 )
-def score_submission(self, submission_id: str, checkpoint_id: str) -> dict[str, str]:
+def score_submission(self, submission_id: str, checkpoint_id: str, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
     return {
         "job_type": "score-submission",
         "submission_id": submission_id,
         "checkpoint_id": checkpoint_id,
         "status": "queued",
+        "trace_id": effective_trace_id,
     }

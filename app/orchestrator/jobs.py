@@ -23,9 +23,7 @@ class JobResult:
     run_id: str
     status: str
 
-
-
-def run_hacker_job(run_id: str) -> dict[str, str]:
+def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
     if os.getenv("HACKER_RUNNER_ENABLED", "false").lower() != "true":
         return asdict(JobResult(job_type="hacker-run", run_id=run_id, status="runner-disabled"))
 
@@ -37,7 +35,7 @@ def run_hacker_job(run_id: str) -> dict[str, str]:
     ]
     runner = HackerAgentRunner()
     scoped_env = build_scoped_model_secret_env(
-        base_env={"RUN_ID": run_id},
+        base_env={"RUN_ID": run_id, "TRACE_ID": trace_id or ""},
         ttl_seconds=int(os.getenv("MODEL_API_KEY_TTL_SECONDS", "300")),
     )
     result = runner.run(
@@ -47,6 +45,7 @@ def run_hacker_job(run_id: str) -> dict[str, str]:
             command=command,
             env=scoped_env,
             task_type="hacker_run",
+            trace_id=trace_id or "",
         ),
         limits=load_hacker_runner_limits_from_env(),
     )
@@ -57,17 +56,18 @@ def run_hacker_job(run_id: str) -> dict[str, str]:
         "container_name": result.container_name,
         "exit_code": "" if result.exit_code is None else str(result.exit_code),
         "log_path": result.log_path or "",
+        "trace_id": trace_id or "",
     }
 
 
 
-def run_judge_job(run_id: str) -> dict[str, str]:
+def run_judge_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
     async def _run() -> int:
         settings = load_settings()
         engine = create_async_engine(settings.database_url, pool_pre_ping=True)
         session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         async with session_factory() as session:
-            created = await run_judge_scoring_worker(session, uuid.UUID(run_id))
+            created = await run_judge_scoring_worker(session, uuid.UUID(run_id), trace_id=trace_id)
         await engine.dispose()
         return created
 
@@ -77,17 +77,18 @@ def run_judge_job(run_id: str) -> dict[str, str]:
         "run_id": run_id,
         "status": "completed",
         "created_scores": str(created_scores),
+        "trace_id": trace_id or "",
     }
 
 
 
-def run_checkpoint_score_job(run_id: str) -> dict[str, str]:
+def run_checkpoint_score_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
     async def _run() -> dict[str, str]:
         settings = load_settings()
         engine = create_async_engine(settings.database_url, pool_pre_ping=True)
         session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
         async with session_factory() as session:
-            result = await run_checkpoint_scoring_worker(session, uuid.UUID(run_id))
+            result = await run_checkpoint_scoring_worker(session, uuid.UUID(run_id), trace_id=trace_id)
         await engine.dispose()
         return {
             "checkpoint_id": result.checkpoint_id,
@@ -102,11 +103,12 @@ def run_checkpoint_score_job(run_id: str) -> dict[str, str]:
         "job_type": "checkpoint-score",
         "run_id": run_id,
         "status": "completed",
+        "trace_id": trace_id or "",
         **details,
     }
 
 
-def run_complete_run_job(run_id: str) -> dict[str, str]:
+def run_complete_run_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
     async def _run() -> dict[str, int]:
         settings = load_settings()
         engine = create_async_engine(settings.database_url, pool_pre_ping=True)
@@ -125,6 +127,7 @@ def run_complete_run_job(run_id: str) -> dict[str, str]:
         "finalized_submissions": str(result["finalized_submissions"]),
         "non_production_penalties": str(result["non_production_penalties"]),
         "leaderboard_entries": str(result["leaderboard_entries"]),
+        "trace_id": trace_id or "",
     }
 
 

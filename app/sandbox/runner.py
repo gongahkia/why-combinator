@@ -26,6 +26,7 @@ class HackerAgentRunSpec:
     command: list[str]
     env: dict[str, str]
     task_type: str = "hacker_run"
+    trace_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,7 @@ def _persist_sandbox_log(
     stderr: str,
     exit_code: int | None,
     timed_out: bool,
+    trace_id: str,
 ) -> str:
     now = datetime.now(UTC)
     retention_seconds = _load_sandbox_log_retention_seconds(task_type)
@@ -108,6 +110,7 @@ def _persist_sandbox_log(
         "expires_at": expires_at.isoformat(),
         "timed_out": timed_out,
         "exit_code": exit_code,
+        "trace_id": trace_id,
         "stdout": stdout,
         "stderr": stderr,
     }
@@ -167,6 +170,7 @@ class HackerAgentRunner:
                 stderr=stderr,
                 exit_code=completed.returncode,
                 timed_out=False,
+                trace_id=spec.trace_id,
             )
             return HackerAgentRunResult(
                 container_name=container_name,
@@ -187,6 +191,7 @@ class HackerAgentRunner:
                 stderr=stderr,
                 exit_code=None,
                 timed_out=True,
+                trace_id=spec.trace_id,
             )
             return HackerAgentRunResult(
                 container_name=container_name,

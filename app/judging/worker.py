@@ -33,7 +33,7 @@ def _build_judge_prompt(challenge_prompt: str, judge_profile_prompt: str, submis
     )
 
 
-def request_codex_evaluation(prompt: str) -> CodexJudgeResult:
+def request_codex_evaluation(prompt: str, trace_id: str | None = None) -> CodexJudgeResult:
     client = CodexClient(max_retries=3, backoff_base_seconds=0.5)
     try:
         response = client.call(CodexRequest(prompt=prompt, temperature=0.1, max_output_tokens=256))
@@ -43,7 +43,7 @@ def request_codex_evaluation(prompt: str) -> CodexJudgeResult:
         return CodexJudgeResult(
             score=score,
             rationale=rationale,
-            raw_response={"provider": "codex", "fallback": False, "response": response.raw},
+            raw_response={"provider": "codex", "fallback": False, "response": response.raw, "trace_id": trace_id or ""},
         )
     except CodexClientError as exc:
         digest = hashlib.sha256(prompt.encode("utf-8")).digest()
@@ -51,7 +51,13 @@ def request_codex_evaluation(prompt: str) -> CodexJudgeResult:
         return CodexJudgeResult(
             score=score,
             rationale="Codex evaluation fallback path used after client error.",
-            raw_response={"provider": "codex", "fallback": True, "error": str(exc), "score": score},
+            raw_response={
+                "provider": "codex",
+                "fallback": True,
+                "error": str(exc),
+                "score": score,
+                "trace_id": trace_id or "",
+            },
         )
 
 
@@ -60,6 +66,7 @@ async def run_judge_scoring_worker(
     run_id: uuid.UUID,
     checkpoint_id: str = "checkpoint",
     submission_ids: set[uuid.UUID] | None = None,
+    trace_id: str | None = None,
 ) -> int:
     run_stmt: Select[tuple[Run]] = (
         select(Run)
@@ -92,7 +99,7 @@ async def run_judge_scoring_worker(
                 judge_profile_prompt=judge_profile.profile_prompt,
                 submission_summary=submission.summary,
             )
-            codex_result = request_codex_evaluation(prompt)
+            codex_result = request_codex_evaluation(prompt, trace_id=trace_id)
             score_row = JudgeScore(
                 submission_id=submission.id,
                 judge_profile_id=judge_profile.id,
