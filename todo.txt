@@ -1,4 +1,3 @@
-(B) Set up Remotion demo video workspace with a 120-second master composition, reusable scene layout primitives, and project-level render config +demo +remotion
 (B) Create a full-use-case storyboard and timing script for a 2-minute demo covering challenge setup, run start, agent execution, judging, scoring, leaderboard, and artifact retrieval +demo +remotion
 (B) Implement Remotion scenes and transitions that visualize the end-to-end product flow using realistic mocked API payloads and UI state overlays +demo +remotion
 (B) Add a reproducible render pipeline to export a 1080p 2-minute MP4 demo with captions, narration track sync points, and final QA checklist +demo +remotion
