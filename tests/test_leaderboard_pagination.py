@@ -167,3 +167,75 @@ async def test_paginated_leaderboard_rejects_expired_cursor_snapshot(
         await get_leaderboard_paginated(run.id, limit=1, cursor=first_page.next_cursor, session=session)
 
     assert exc_info.value.status_code == 410
+
+
+@pytest.mark.asyncio
+async def test_paginated_leaderboard_cursor_stays_stable_under_concurrent_score_writes(
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run, submissions = await _seed_ranked_leaderboard(session)
+    snapshot_store: dict[tuple[str, str], list[dict[str, object]]] = {}
+
+    monkeypatch.setattr("app.api.leaderboard.read_leaderboard_scoreboard_cache", lambda _: None)
+    monkeypatch.setattr(
+        "app.api.leaderboard.write_leaderboard_cursor_snapshot",
+        lambda run_id, snapshot_id, entries: snapshot_store.__setitem__((str(run_id), snapshot_id), entries),
+    )
+    monkeypatch.setattr(
+        "app.api.leaderboard.read_leaderboard_cursor_snapshot",
+        lambda run_id, snapshot_id: snapshot_store.get((str(run_id), snapshot_id)),
+    )
+
+    first_page = await get_leaderboard_paginated(run.id, limit=1, cursor=None, session=session)
+    assert [item.submission_id for item in first_page.items] == [submissions[0].id]
+    assert first_page.next_cursor is not None
+
+    # Simulate concurrent scoring writes reshuffling live ranking between page fetches.
+    for checkpoint_id, submission, score in [
+        ("cp-concurrent-1", submissions[2], 0.98),
+        ("cp-concurrent-2", submissions[1], 0.99),
+    ]:
+        session.add(
+            ScoreEvent(
+                submission_id=submission.id,
+                checkpoint_id=checkpoint_id,
+                quality_score=score,
+                novelty_score=score,
+                feasibility_score=score,
+                criteria_score=score,
+                final_score=score,
+                payload={"source": "concurrent-update"},
+                payload_checksum=f"checksum-{submission.id}-{checkpoint_id}",
+            )
+        )
+        await session.commit()
+        await materialize_leaderboard(session, run.id)
+        await session.commit()
+
+    second_page = await get_leaderboard_paginated(run.id, limit=1, cursor=first_page.next_cursor, session=session)
+    assert [item.submission_id for item in second_page.items] == [submissions[1].id]
+    assert second_page.next_cursor is not None
+
+    # More concurrent writes happen before final page fetch.
+    session.add(
+        ScoreEvent(
+            submission_id=submissions[0].id,
+            checkpoint_id="cp-concurrent-3",
+            quality_score=0.6,
+            novelty_score=0.6,
+            feasibility_score=0.6,
+            criteria_score=0.6,
+            final_score=0.6,
+            payload={"source": "concurrent-update"},
+            payload_checksum=f"checksum-{submissions[0].id}-cp-concurrent-3",
+        )
+    )
+    await session.commit()
+    await materialize_leaderboard(session, run.id)
+    await session.commit()
+
+    third_page = await get_leaderboard_paginated(run.id, limit=1, cursor=second_page.next_cursor, session=session)
+    assert [item.submission_id for item in third_page.items] == [submissions[2].id]
+    assert third_page.next_cursor is None
+    assert third_page.has_more is False
