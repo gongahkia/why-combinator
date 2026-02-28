@@ -10,16 +10,17 @@ import re
 import yaml
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
-from app.db.models import Challenge, JudgeProfile
+from app.db.models import Challenge, JudgeProfile, JudgeProfileVersion
 from app.ingest.allowlist import URLAllowlistError, assert_url_allowed_for_challenge
 from app.ingest.profile_parser import ProfileParseError, parse_profile_payload
 from app.ingest.sanitize import URLSanitizationError, sanitize_ingestion_url
 from app.ingest.url_cache import fetch_url_content_cached
 from app.ingest.url_fetch import URLFetchError
+from app.judging.versioning import create_judge_profile_version_snapshot
 from app.security.prompt_injection import PromptInjectionError, assert_no_prompt_injection
 
 router = APIRouter(prefix="/challenges", tags=["judging"])
@@ -72,6 +73,21 @@ class JudgeProfileResponse(BaseModel):
     updated_at: datetime
 
 
+class JudgeProfileVersionActivateRequest(BaseModel):
+    expected_lock_version: int = Field(ge=1)
+
+
+class JudgeProfileVersionResponse(BaseModel):
+    id: uuid.UUID
+    challenge_id: uuid.UUID
+    version_number: int
+    is_active: bool
+    lock_version: int
+    profile_count: int
+    created_at: datetime
+    updated_at: datetime
+
+
 def _to_judge_profile_response(profile: JudgeProfile) -> JudgeProfileResponse:
     return JudgeProfileResponse(
         id=profile.id,
@@ -83,6 +99,20 @@ def _to_judge_profile_response(profile: JudgeProfile) -> JudgeProfileResponse:
         source_type=profile.source_type,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
+    )
+
+
+def _to_judge_profile_version_response(version: JudgeProfileVersion) -> JudgeProfileVersionResponse:
+    payload = version.profiles_payload if isinstance(version.profiles_payload, list) else []
+    return JudgeProfileVersionResponse(
+        id=version.id,
+        challenge_id=version.challenge_id,
+        version_number=version.version_number,
+        is_active=version.is_active,
+        lock_version=version.lock_version,
+        profile_count=len(payload),
+        created_at=version.created_at,
+        updated_at=version.updated_at,
     )
 
 
@@ -181,6 +211,15 @@ async def persist_profiles(
     source_type: str,
     session: AsyncSession,
 ) -> list[JudgeProfileResponse]:
+    profile_rows = [(profile, source_type) for profile in profiles]
+    return await _persist_profiles_with_sources(challenge_id, profile_rows, session)
+
+
+async def _persist_profiles_with_sources(
+    challenge_id: uuid.UUID,
+    profile_rows: list[tuple[JudgeProfileInput, str]],
+    session: AsyncSession,
+) -> list[JudgeProfileResponse]:
     challenge = await session.get(Challenge, challenge_id)
     if challenge is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
@@ -190,7 +229,7 @@ async def persist_profiles(
         JudgeProfile.head_judge.is_(True),
     )
     existing_head_count = (await session.execute(existing_head_stmt)).scalar_one()
-    incoming_head_count = sum(1 for item in profiles if item.head_judge)
+    incoming_head_count = sum(1 for item, _source in profile_rows if item.head_judge)
     if existing_head_count + incoming_head_count > 1:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -206,9 +245,11 @@ async def persist_profiles(
             head_judge=item.head_judge,
             source_type=source_type,
         )
-        for item in profiles
+        for item, source_type in profile_rows
     ]
     session.add_all(db_profiles)
+    await session.flush()
+    await create_judge_profile_version_snapshot(session, challenge_id, activate=True)
     await session.commit()
     for profile in db_profiles:
         await session.refresh(profile)
@@ -275,10 +316,6 @@ async def register_judge_profiles_bulk(
     if not files:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="at least one file is required")
 
-    challenge = await session.get(Challenge, challenge_id)
-    if challenge is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
-
     parsed_profiles: list[tuple[JudgeProfileInput, str]] = []
     for file in files:
         filename = (file.filename or "uploaded-profile").strip() or "uploaded-profile"
@@ -291,34 +328,59 @@ async def register_judge_profiles_bulk(
         profile_inputs, source_type = parse_bulk_profile_file(filename, content, file.content_type)
         parsed_profiles.extend((profile_input, source_type) for profile_input in profile_inputs)
 
-    existing_head_stmt: Select[tuple[int]] = select(func.count()).select_from(JudgeProfile).where(
-        JudgeProfile.challenge_id == challenge_id,
-        JudgeProfile.head_judge.is_(True),
+    return await _persist_profiles_with_sources(challenge_id, parsed_profiles, session)
+
+
+@router.get(
+    "/{challenge_id}/judge-profile-versions",
+    response_model=list[JudgeProfileVersionResponse],
+)
+async def list_judge_profile_versions(
+    challenge_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> list[JudgeProfileVersionResponse]:
+    challenge = await session.get(Challenge, challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+
+    versions_stmt: Select[tuple[JudgeProfileVersion]] = (
+        select(JudgeProfileVersion)
+        .where(JudgeProfileVersion.challenge_id == challenge_id)
+        .order_by(JudgeProfileVersion.version_number.desc())
     )
-    existing_head_count = (await session.execute(existing_head_stmt)).scalar_one()
-    incoming_head_count = sum(1 for item, _source in parsed_profiles if item.head_judge)
-    if existing_head_count + incoming_head_count > 1:
+    versions = (await session.execute(versions_stmt)).scalars().all()
+    return [_to_judge_profile_version_response(version) for version in versions]
+
+
+@router.post(
+    "/{challenge_id}/judge-profile-versions/{version_id}/activate",
+    response_model=JudgeProfileVersionResponse,
+)
+async def activate_judge_profile_version(
+    challenge_id: uuid.UUID,
+    version_id: uuid.UUID,
+    payload: JudgeProfileVersionActivateRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> JudgeProfileVersionResponse:
+    version = await session.get(JudgeProfileVersion, version_id)
+    if version is None or version.challenge_id != challenge_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="judge profile version not found")
+    if version.lock_version != payload.expected_lock_version:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="at most one head_judge is allowed per challenge panel",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="judge profile version lock mismatch",
         )
 
-    db_profiles = [
-        JudgeProfile(
-            challenge_id=challenge_id,
-            domain=item.domain,
-            scoring_style=item.scoring_style,
-            profile_prompt=item.profile_prompt,
-            head_judge=item.head_judge,
-            source_type=source_type,
-        )
-        for item, source_type in parsed_profiles
-    ]
-    session.add_all(db_profiles)
+    await session.execute(
+        update(JudgeProfileVersion)
+        .where(JudgeProfileVersion.challenge_id == challenge_id)
+        .values(is_active=False)
+    )
+    version.is_active = True
+    version.lock_version += 1
     await session.commit()
-    for profile in db_profiles:
-        await session.refresh(profile)
-    return [_to_judge_profile_response(profile) for profile in db_profiles]
+    await session.refresh(version)
+    return _to_judge_profile_version_response(version)
 
 
 @router.post(

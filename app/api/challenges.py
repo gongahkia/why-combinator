@@ -14,6 +14,7 @@ from app.api.rate_limit import rate_limit_dependency
 from app.auth.quotas import QuotaUsageDelta, current_quota_user_id, increment_quota_usage, quota_limits_from_settings
 from app.config import load_settings
 from app.db.models import Challenge, JudgeProfile, Run
+from app.judging.versioning import create_judge_profile_version_snapshot
 
 router = APIRouter(prefix="/challenges", tags=["challenges"])
 
@@ -137,6 +138,7 @@ async def clone_challenge(
     if cloned_judge_profiles:
         session.add_all(cloned_judge_profiles)
         await session.flush()
+        await create_judge_profile_version_snapshot(session, cloned_challenge.id, activate=True)
 
     await increment_quota_usage(
         session,

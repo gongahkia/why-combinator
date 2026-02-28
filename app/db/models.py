@@ -190,6 +190,20 @@ class JudgeProfile(TimestampMixin, Base):
     judge_scores: Mapped[list[JudgeScore]] = relationship(back_populates="judge_profile", cascade="all, delete-orphan")
 
 
+class JudgeProfileVersion(TimestampMixin, Base):
+    __tablename__ = "judge_profile_versions"
+    __table_args__ = (UniqueConstraint("challenge_id", "version_number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    challenge_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("challenges.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
+    lock_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    profiles_payload: Mapped[list[dict[str, object]]] = mapped_column(JSON, nullable=False, default=list)
+
+
 class JudgeScore(TimestampMixin, Base):
     __tablename__ = "judge_scores"
 

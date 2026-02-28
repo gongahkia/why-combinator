@@ -6,6 +6,7 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import JudgeProfile
+from app.judging.versioning import create_judge_profile_version_snapshot
 
 DEFAULT_JUDGE_PANEL: list[tuple[str, str, str]] = [
     ("domain_expert", "strict", "Domain expert judge focused on core solution quality."),
@@ -72,4 +73,6 @@ async def seed_default_judge_panel_if_incomplete(
         session.add(compliance_row)
         created.append(compliance_row)
         await session.flush()
+    if created:
+        await create_judge_profile_version_snapshot(session, challenge_id, activate=True)
     return created
