@@ -17,6 +17,7 @@ from app.api.infra import router as infra_router
 from app.api.judges import router as judges_router
 from app.api.leaderboard import router as leaderboard_router
 from app.api.mvps import router as mvps_router
+from app.api.realtime import router as realtime_router
 from app.api.runs import router as runs_router
 from app.api.scoring import router as scoring_router
 from app.api.submissions import router as submissions_router
@@ -65,6 +66,7 @@ app.include_router(leaderboard_router)
 app.include_router(mvps_router)
 app.include_router(timeline_router)
 app.include_router(submissions_router)
+app.include_router(realtime_router)
 app.include_router(exports_router)
 app.include_router(infra_router)
 
