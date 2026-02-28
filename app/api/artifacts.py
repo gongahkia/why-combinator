@@ -17,6 +17,7 @@ from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
 from app.validation.readme import validate_minimum_readme_content
+from app.validation.value_hypothesis import validate_measurable_value_hypothesis
 
 router = APIRouter(prefix="/submissions", tags=["artifacts"])
 
@@ -159,8 +160,7 @@ async def validate_submission_mandatory_requirements(
     artifacts = (await session.execute(artifact_stmt)).scalars().all()
     errors: list[str] = []
 
-    if not submission.value_hypothesis.strip():
-        errors.append("value_hypothesis is required")
+    errors.extend(validate_measurable_value_hypothesis(submission.value_hypothesis))
     if not any(_is_runnable_artifact(artifact) for artifact in artifacts):
         errors.append("at least one runnable artifact is required")
 
