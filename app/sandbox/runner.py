@@ -16,6 +16,7 @@ from pathlib import Path
 class SandboxLimits:
     cpu_cores: float
     memory_mb: int
+    startup_timeout_seconds: int
     timeout_seconds: int
 
 
@@ -34,6 +35,7 @@ class HackerAgentRunResult:
     container_name: str
     exit_code: int | None
     timed_out: bool
+    startup_timed_out: bool
     stdout: str
     stderr: str
     log_path: str | None
@@ -124,6 +126,22 @@ class HackerAgentRunner:
     def __init__(self, docker_bin: str = "docker") -> None:
         self._docker_bin = docker_bin
 
+    def _probe_container_startup(self, image: str, startup_timeout_seconds: int) -> tuple[bool, str]:
+        probe_command = [self._docker_bin, "run", "--rm", "--network", "none", image, "true"]
+        try:
+            completed = subprocess.run(
+                probe_command,
+                capture_output=True,
+                text=True,
+                timeout=startup_timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return False, f"container startup probe timed out after {startup_timeout_seconds} seconds"
+        if completed.returncode != 0:
+            return False, completed.stderr or "container startup probe failed"
+        return True, ""
+
     def run(self, spec: HackerAgentRunSpec, limits: SandboxLimits) -> HackerAgentRunResult:
         container_name = f"hacker-agent-{spec.agent_id[:12]}-{uuid.uuid4().hex[:8]}"
         ephemeral_workdir = tempfile.mkdtemp(prefix=f"{container_name}-")
@@ -153,6 +171,28 @@ class HackerAgentRunner:
         docker_cmd.extend(spec.command)
 
         try:
+            startup_ok, startup_error = self._probe_container_startup(spec.image, limits.startup_timeout_seconds)
+            if not startup_ok:
+                max_log_bytes = _load_sandbox_log_max_bytes()
+                stderr = _redact_sensitive_values(_truncate_output(startup_error, max_log_bytes), spec.env)
+                log_path = _persist_sandbox_log(
+                    container_name=container_name,
+                    task_type=spec.task_type,
+                    stdout="",
+                    stderr=stderr,
+                    exit_code=None,
+                    timed_out=True,
+                    trace_id=spec.trace_id,
+                )
+                return HackerAgentRunResult(
+                    container_name=container_name,
+                    exit_code=None,
+                    timed_out=True,
+                    startup_timed_out=True,
+                    stdout="",
+                    stderr=stderr,
+                    log_path=log_path,
+                )
             completed = subprocess.run(
                 docker_cmd,
                 capture_output=True,
@@ -176,6 +216,7 @@ class HackerAgentRunner:
                 container_name=container_name,
                 exit_code=completed.returncode,
                 timed_out=False,
+                startup_timed_out=False,
                 stdout=stdout,
                 stderr=stderr,
                 log_path=log_path,
@@ -197,6 +238,7 @@ class HackerAgentRunner:
                 container_name=container_name,
                 exit_code=None,
                 timed_out=True,
+                startup_timed_out=False,
                 stdout=stdout,
                 stderr=stderr,
                 log_path=log_path,
@@ -209,5 +251,6 @@ def load_hacker_runner_limits_from_env() -> SandboxLimits:
     return SandboxLimits(
         cpu_cores=float(os.getenv("HACKER_RUNNER_CPU_CORES", "1.0")),
         memory_mb=int(os.getenv("HACKER_RUNNER_MEMORY_MB", "1024")),
+        startup_timeout_seconds=int(os.getenv("HACKER_RUNNER_STARTUP_TIMEOUT_SECONDS", "30")),
         timeout_seconds=int(os.getenv("HACKER_RUNNER_TIMEOUT_SECONDS", "300")),
     )

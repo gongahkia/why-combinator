@@ -52,7 +52,7 @@ def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
     return {
         "job_type": "hacker-run",
         "run_id": run_id,
-        "status": "timeout" if result.timed_out else "completed",
+        "status": "startup_timeout" if result.startup_timed_out else ("timeout" if result.timed_out else "completed"),
         "container_name": result.container_name,
         "exit_code": "" if result.exit_code is None else str(result.exit_code),
         "log_path": result.log_path or "",
