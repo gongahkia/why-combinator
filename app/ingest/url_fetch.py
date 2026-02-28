@@ -9,13 +9,25 @@ class URLFetchError(RuntimeError):
 
 
 def fetch_url_content(url: str, timeout_seconds: int = 10, max_bytes: int = 1024 * 1024) -> bytes:
+    connect_timeout_seconds = max(1, min(timeout_seconds, 5))
+    read_timeout_seconds = max(1, timeout_seconds)
+    max_redirects = 5
     cmd = [
         "curl",
         "--silent",
         "--show-error",
+        "--fail",
         "--location",
+        "--proto",
+        "=http,https",
+        "--connect-timeout",
+        str(connect_timeout_seconds),
         "--max-time",
-        str(timeout_seconds),
+        str(read_timeout_seconds),
+        "--max-redirs",
+        str(max_redirects),
+        "--max-filesize",
+        str(max_bytes),
         url,
     ]
 
