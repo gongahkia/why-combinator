@@ -1,5 +1,5 @@
-[![](https://img.shields.io/badge/why--combinator_2.0.0-integrated-green)](https://github.com/gongahkia/why-combinator)
-![](https://img.shields.io/badge/status-active-blue)
+[![](https://img.shields.io/badge/why_combinator_1.0.0-passing-light_green)](https://github.com/gongahkia/why-combinator/releases/tag/1.0.0)
+[![](https://img.shields.io/badge/why_combinator_2.0.0-passing-green)](https://github.com/gongahkia/why-combinator/releases/tag/2.0.0)
 
 # `Why-Combinator`
 
