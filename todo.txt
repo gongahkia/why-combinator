@@ -1,4 +1,3 @@
-(A) Implement sandbox filesystem mount policy with read-only base image and writable ephemeral workdir +sandbox +security
 (A) Implement secrets injection for model API keys via short-lived env vars scoped to job execution +security +agents
 (A) Implement model client wrapper for Codex agent calls with retries, exponential backoff, and structured error typing +agents +integrations
 (A) Implement prompt templating engine for Hacker Agents using challenge, criteria, risk appetite, and slider inputs +agents +prompting

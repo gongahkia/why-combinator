@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import tempfile
 import uuid
 from dataclasses import dataclass
 
@@ -36,6 +38,7 @@ class HackerAgentRunner:
 
     def run(self, spec: HackerAgentRunSpec, limits: SandboxLimits) -> HackerAgentRunResult:
         container_name = f"hacker-agent-{spec.agent_id[:12]}-{uuid.uuid4().hex[:8]}"
+        ephemeral_workdir = tempfile.mkdtemp(prefix=f"{container_name}-")
         docker_cmd = [
             self._docker_bin,
             "run",
@@ -44,6 +47,13 @@ class HackerAgentRunner:
             container_name,
             "--network",
             "none",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=256m",
+            "--mount",
+            f"type=bind,src={ephemeral_workdir},dst=/workspace",
+            "--workdir",
+            "/workspace",
             "--cpus",
             str(limits.cpu_cores),
             "--memory",
@@ -77,6 +87,8 @@ class HackerAgentRunner:
                 stdout=exc.stdout or "",
                 stderr=exc.stderr or "",
             )
+        finally:
+            shutil.rmtree(ephemeral_workdir, ignore_errors=True)
 
 
 def load_hacker_runner_limits_from_env() -> SandboxLimits:
