@@ -1,4 +1,3 @@
-(A) Implement artifact overlap detector using file hash shingles and dependency manifest overlap metrics +novelty +scoring
 (A) Implement too-safe penalty scorer comparing submission embeddings against baseline idea embeddings +penalties +novelty
 (A) Implement periodic checkpoint scheduler that enqueues scoring jobs at fixed interval until run end +scheduler +scoring
 (A) Implement judge scoring worker that requests Codex evaluation using challenge criteria and judge domain prompts +judging +agents
