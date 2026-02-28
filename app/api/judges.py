@@ -4,10 +4,11 @@ import csv
 import io
 import uuid
 from datetime import datetime
+import re
 
 import yaml
 from fastapi import APIRouter, Body, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
@@ -24,6 +25,24 @@ class JudgeProfileInput(BaseModel):
     scoring_style: str = Field(min_length=2, max_length=64)
     profile_prompt: str = Field(min_length=8)
     head_judge: bool = False
+
+    @field_validator("domain")
+    @classmethod
+    def validate_domain(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{1,254}", normalized):
+            raise ValueError("domain must match pattern [a-z][a-z0-9_-]{1,254}")
+        return normalized
+
+    @field_validator("scoring_style")
+    @classmethod
+    def validate_scoring_style(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        allowed = {"strict", "balanced", "creative", "risk_weighted"}
+        if normalized not in allowed:
+            allowed_csv = ", ".join(sorted(allowed))
+            raise ValueError(f"scoring_style must be one of: {allowed_csv}")
+        return normalized
 
 
 class JudgeProfileRegisterJSONRequest(BaseModel):
