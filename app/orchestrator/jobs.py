@@ -19,6 +19,7 @@ from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
 from app.prompting.hacker import HackerPromptInput, render_hacker_agent_prompt
 from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
+from app.sandbox.cleanup import cleanup_sandbox_resources
 from app.scoring.weights import DEFAULT_WEIGHTS
 from app.scheduler.run_timeout import fail_stale_runs_without_worker_heartbeat
 from app.scoring.checkpoint import run_checkpoint_scoring_worker
@@ -288,6 +289,16 @@ def run_stale_run_heartbeat_watchdog_job(trace_id: str | None = None) -> dict[st
         "status": "completed",
         "trace_id": trace_id or "",
         **details,
+    }
+
+
+def run_sandbox_cleanup_job(trace_id: str | None = None) -> dict[str, str]:
+    summary = cleanup_sandbox_resources()
+    return {
+        "job_type": "sandbox-cleanup",
+        "status": "completed",
+        "trace_id": trace_id or "",
+        **summary.as_dict(),
     }
 
 

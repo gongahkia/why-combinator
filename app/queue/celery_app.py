@@ -28,6 +28,7 @@ celery_app.conf.update(
         "app.queue.jobs.relay_outbox_events": {"queue": "outbox-relay"},
         "app.queue.jobs.scheduler_heartbeat_monitor": {"queue": "scheduler-monitor"},
         "app.queue.jobs.run_heartbeat_watchdog": {"queue": "run-heartbeat-watchdog"},
+        "app.queue.jobs.cleanup_sandbox_resources": {"queue": "sandbox-cleanup"},
         "app.queue.jobs.complete_run": {"queue": "run-complete"},
         "app.queue.jobs.score_submission": {"queue": "score-submission"},
         "app.queue.jobs.recover_orphaned_tasks": {"queue": "recovery"},

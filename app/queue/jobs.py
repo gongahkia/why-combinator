@@ -21,6 +21,7 @@ from app.orchestrator.jobs import (
     run_hacker_job,
     run_judge_job,
     run_outbox_relay_job,
+    run_sandbox_cleanup_job,
     run_scheduler_heartbeat_monitor_job,
     run_stale_run_heartbeat_watchdog_job,
 )
@@ -533,6 +534,18 @@ def complete_run(self, run_id: str, trace_id: str | None = None) -> dict[str, st
 def run_heartbeat_watchdog(self, trace_id: str | None = None) -> dict[str, str]:
     effective_trace_id = ensure_trace_id(trace_id)
     return run_stale_run_heartbeat_watchdog_job(trace_id=effective_trace_id)
+
+
+@shared_task(
+    name="app.queue.jobs.cleanup_sandbox_resources",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def cleanup_sandbox_resources(self, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
+    return run_sandbox_cleanup_job(trace_id=effective_trace_id)
 
 
 def enqueue_submission_score_job(
