@@ -13,6 +13,7 @@ from app.orchestrator.run_completion import complete_run
 from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
 from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
+from app.scoring.checkpoint import run_checkpoint_scoring_worker
 from app.security.secrets import build_scoped_model_secret_env
 
 
@@ -79,7 +80,28 @@ def run_judge_job(run_id: str) -> dict[str, str]:
 
 
 def run_checkpoint_score_job(run_id: str) -> dict[str, str]:
-    return asdict(JobResult(job_type="checkpoint-score", run_id=run_id, status="queued"))
+    async def _run() -> dict[str, str]:
+        settings = load_settings()
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with session_factory() as session:
+            result = await run_checkpoint_scoring_worker(session, uuid.UUID(run_id))
+        await engine.dispose()
+        return {
+            "checkpoint_id": result.checkpoint_id,
+            "scored_submissions": str(result.scored_submissions),
+            "skipped_submissions": str(result.skipped_submissions),
+            "judge_scores_created": str(result.judge_scores_created),
+            "leaderboard_entries": str(result.leaderboard_entries),
+        }
+
+    details = asyncio.run(_run())
+    return {
+        "job_type": "checkpoint-score",
+        "run_id": run_id,
+        "status": "completed",
+        **details,
+    }
 
 
 def run_complete_run_job(run_id: str) -> dict[str, str]:
