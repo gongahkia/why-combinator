@@ -100,6 +100,7 @@ class Submission(TimestampMixin, Base):
     value_hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    human_testing_required: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     run: Mapped[Run] = relationship(back_populates="submissions")
     agent: Mapped[Agent] = relationship(back_populates="submissions")

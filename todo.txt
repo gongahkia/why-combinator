@@ -1,4 +1,3 @@
-(A) Implement human-testing-required flag on submissions when runtime validation fails or is skipped by executor +validation +submissions
 (A) Implement runtime validator subagent workflow for CLI artifacts that executes declared command and captures exit code +validation +agents
 (A) Implement runtime validator subagent workflow for API artifacts that boots service and probes health endpoint +validation +agents
 (A) Implement runtime validator subagent workflow for web artifacts that serves build and checks HTTP 200 and console errors +validation +agents
