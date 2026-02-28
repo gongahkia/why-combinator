@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.api.rate_limit import rate_limit_dependency
-from app.auth.quotas import QuotaUsageDelta, current_quota_user_id, increment_quota_usage
+from app.auth.quotas import QuotaUsageDelta, current_quota_user_id, increment_quota_usage, quota_limits_from_settings
+from app.config import load_settings
 from app.db.models import Challenge, Run
 
 router = APIRouter(prefix="/challenges", tags=["challenges"])
@@ -71,6 +72,7 @@ async def create_challenge(
         session,
         quota_user_id=current_quota_user_id(),
         delta=QuotaUsageDelta(challenges_created=1),
+        limits=quota_limits_from_settings(load_settings()),
     )
     await session.commit()
     await session.refresh(challenge)

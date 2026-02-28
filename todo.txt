@@ -1,4 +1,3 @@
-(B) Implement quota enforcement middleware returning structured over-quota errors +auth +quotas
 (B) Implement challenge template cloning endpoint to duplicate config and judge panel into new draft challenge +api +challenge
 (B) Implement bulk judge profile import endpoint accepting mixed JSON/YAML/CSV files in multipart payload +api +judging
 (B) Implement judge profile versioning table with active/inactive selection and optimistic locking +db +judging

@@ -16,7 +16,7 @@ from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
 from app.events.bus import make_run_lifecycle_event
 from app.events.outbox import enqueue_run_lifecycle_event_outbox
-from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, resolve_quota_user_id
+from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, quota_limits_from_request, resolve_quota_user_id
 from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.admission import evaluate_run_admission_capacity
 from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incomplete
@@ -152,6 +152,7 @@ async def start_run(
         session,
         quota_user_id=resolve_quota_user_id(request),
         delta=QuotaUsageDelta(runs_started=1),
+        limits=quota_limits_from_request(request),
     )
     await session.commit()
     await session.refresh(run)

@@ -17,6 +17,7 @@ from app.api.infra import router as infra_router
 from app.api.judges import router as judges_router
 from app.api.leaderboard import router as leaderboard_router
 from app.api.mvps import router as mvps_router
+from app.api.quota_enforcement import QuotaEnforcementMiddleware
 from app.api.realtime import router as realtime_router
 from app.api.runs import router as runs_router
 from app.api.scoring import router as scoring_router
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Hackathon Service", lifespan=lifespan)
 app.add_middleware(TraceIdMiddleware)
 app.add_middleware(AuthMiddleware)
+app.add_middleware(QuotaEnforcementMiddleware)
 app.include_router(challenges_router)
 app.include_router(challenge_keys_router)
 app.include_router(judges_router)

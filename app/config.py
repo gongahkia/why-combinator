@@ -12,6 +12,9 @@ class Settings:
     pg_max_overflow: int
     default_run_budget_units: int
     artifact_storage_path: str
+    quota_limit_challenges_created: int
+    quota_limit_runs_started: int
+    quota_limit_artifact_storage_bytes: int
 
 
 
@@ -26,4 +29,7 @@ def load_settings() -> Settings:
         pg_max_overflow=int(os.getenv("PG_MAX_OVERFLOW", "20")),
         default_run_budget_units=int(os.getenv("DEFAULT_RUN_BUDGET_UNITS", "1000")),
         artifact_storage_path=os.getenv("ARTIFACT_STORAGE_PATH", "/tmp/hackathon-artifacts"),
+        quota_limit_challenges_created=int(os.getenv("QUOTA_LIMIT_CHALLENGES_CREATED", "0")),
+        quota_limit_runs_started=int(os.getenv("QUOTA_LIMIT_RUNS_STARTED", "0")),
+        quota_limit_artifact_storage_bytes=int(os.getenv("QUOTA_LIMIT_ARTIFACT_STORAGE_BYTES", "0")),
     )

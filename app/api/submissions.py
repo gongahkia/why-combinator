@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.artifacts.git_checkout import GitCheckoutError, isolated_git_checkout
 from app.artifacts.retention import compute_artifact_expiry
 from app.api.deps import get_db_session
-from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, resolve_quota_user_id
+from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, quota_limits_from_request, resolve_quota_user_id
 from app.db.idempotency import (
     get_idempotent_response,
     hash_request_payload,
@@ -218,6 +218,7 @@ async def ingest_submission_transactional(
             session,
             quota_user_id=resolve_quota_user_id(request),
             delta=QuotaUsageDelta(artifact_storage_bytes=ingested_total_bytes),
+            limits=quota_limits_from_request(request),
         )
 
     await session.refresh(submission)
@@ -301,6 +302,7 @@ async def attach_repository_submission_source(
         session,
         quota_user_id=resolve_quota_user_id(request),
         delta=QuotaUsageDelta(artifact_storage_bytes=repo_storage_bytes),
+        limits=quota_limits_from_request(request),
     )
     await session.commit()
     await session.refresh(submission)

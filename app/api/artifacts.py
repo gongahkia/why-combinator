@@ -15,7 +15,7 @@ from app.db.enums import ArtifactType
 from app.db.models import Artifact, Challenge, Run, Submission
 from app.artifacts.retention import ArtifactRetentionPolicyError, compute_artifact_expiry
 from app.artifacts.retention import is_artifact_expired
-from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, resolve_quota_user_id
+from app.auth.quotas import QuotaUsageDelta, increment_quota_usage, quota_limits_from_request, resolve_quota_user_id
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.adapter import ObjectStorageAdapter, build_object_storage_adapter
 from app.storage.local import ArchiveExtractionError, validate_archive_members_safe
@@ -146,6 +146,7 @@ async def upload_artifact(
         session,
         quota_user_id=resolve_quota_user_id(request),
         delta=QuotaUsageDelta(artifact_storage_bytes=len(content)),
+        limits=quota_limits_from_request(request),
     )
     await session.commit()
     await session.refresh(artifact)
