@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.artifacts.git_checkout import GitCheckoutError, isolated_git_checkout
 from app.api.deps import get_db_session
 from app.db.idempotency import (
     get_idempotent_response,
@@ -19,6 +22,7 @@ from app.db.models import Agent, Run, Submission
 from app.db.enums import ArtifactType
 from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
+from app.queue.jobs import enqueue_submission_score_job
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
@@ -59,6 +63,20 @@ class SubmissionIngestRequest(BaseModel):
 class SubmissionIngestResponse(BaseModel):
     submission: SubmissionResponse
     artifact_ids: list[uuid.UUID]
+
+
+class RepositorySubmissionSourceRequest(BaseModel):
+    agent_id: uuid.UUID
+    value_hypothesis: str = Field(min_length=5)
+    repository_url: str = Field(min_length=8)
+    commit: str = Field(min_length=7, max_length=64)
+
+
+class RepositorySubmissionSourceResponse(BaseModel):
+    submission: SubmissionResponse
+    artifact_id: uuid.UUID
+    resolved_commit: str
+    ingestion_job: dict[str, str]
 
 
 @router.post("/{run_id}/submissions", status_code=status.HTTP_201_CREATED, response_model=SubmissionResponse)
@@ -184,4 +202,77 @@ async def ingest_submission_transactional(
     return SubmissionIngestResponse(
         submission=SubmissionResponse.model_validate(submission, from_attributes=True),
         artifact_ids=artifact_ids,
+    )
+
+
+@router.post(
+    "/{run_id}/submissions/repository-source",
+    status_code=status.HTTP_201_CREATED,
+    response_model=RepositorySubmissionSourceResponse,
+)
+async def attach_repository_submission_source(
+    run_id: uuid.UUID,
+    payload: RepositorySubmissionSourceRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> RepositorySubmissionSourceResponse:
+    run = await session.get(Run, run_id)
+    if run is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    challenge = await session.get(Challenge, run.challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
+    agent = await session.get(Agent, payload.agent_id)
+    if agent is None or agent.run_id != run_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="agent does not belong to run")
+
+    checkout_root = os.path.join(request.app.state.settings.artifact_storage_path, "repo-checkouts")
+    try:
+        checkout = isolated_git_checkout(
+            repository_url=payload.repository_url,
+            commit=payload.commit,
+            destination_root=checkout_root,
+            shallow_depth=1,
+        )
+    except GitCheckoutError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"repository checkout failed: {exc}") from exc
+
+    summary = generate_submission_semantic_summary(
+        challenge_prompt=challenge.prompt,
+        value_hypothesis=payload.value_hypothesis,
+        artifact_descriptors=[f"repository:{payload.repository_url}@{checkout.commit}"],
+    )
+
+    submission = Submission(
+        run_id=run_id,
+        agent_id=payload.agent_id,
+        value_hypothesis=payload.value_hypothesis,
+        summary=summary,
+    )
+    session.add(submission)
+    await session.flush()
+
+    root_path = Path(request.app.state.settings.artifact_storage_path)
+    checkout_path = Path(checkout.checkout_path)
+    try:
+        storage_key = str(checkout_path.relative_to(root_path))
+    except ValueError:
+        storage_key = str(checkout_path)
+
+    artifact = Artifact(
+        submission_id=submission.id,
+        artifact_type=ArtifactType.CLI_PACKAGE,
+        storage_key=storage_key,
+        content_hash=hashlib.sha256(f"{payload.repository_url}@{checkout.commit}".encode("utf-8")).hexdigest(),
+    )
+    session.add(artifact)
+    await session.flush()
+    await session.commit()
+    await session.refresh(submission)
+    ingestion_job = enqueue_submission_score_job(submission.id, "repository_ingest")
+    return RepositorySubmissionSourceResponse(
+        submission=SubmissionResponse.model_validate(submission, from_attributes=True),
+        artifact_id=artifact.id,
+        resolved_commit=checkout.commit,
+        ingestion_job=ingestion_job,
     )

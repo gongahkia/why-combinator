@@ -1,4 +1,3 @@
-(A) Implement API endpoint to attach external repository URL as submission source and trigger ingestion pipeline +api +artifacts
 (A) Implement runtime validator for repository artifacts that auto-detects project type and executes safe test command +validation +agents
 (A) Implement asynchronous scoring backfill job for temporarily failed checkpoints after dependency recovery +scoring +reliability
 (A) Implement scoreboard cache in Redis with write-through invalidation on score and penalty event insert +leaderboard +cache
