@@ -11,7 +11,8 @@ from app.db.idempotency import (
     hash_request_payload,
     store_idempotent_response,
 )
-from app.db.models import ScoreEvent
+from app.db.models import ScoreEvent, Submission
+from app.leaderboard.cache import invalidate_leaderboard_scoreboard_cache
 
 
 def compute_score_event_payload_checksum(payload: dict[str, object]) -> str:
@@ -64,6 +65,10 @@ async def create_score_event_idempotent(
     )
     session.add(score_event)
     await session.flush()
+    submission = await session.get(Submission, submission_id)
+    if submission is None:
+        raise ValueError("score event submission not found")
+    invalidate_leaderboard_scoreboard_cache(submission.run_id)
     await store_idempotent_response(
         session,
         scope,

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import SubmissionState
 from app.db.models import LeaderboardEntry, PenaltyEvent, ScoreEvent, Submission
+from app.leaderboard.cache import write_leaderboard_scoreboard_cache
 
 
 @dataclass(frozen=True)
@@ -79,6 +80,7 @@ async def materialize_leaderboard(session: AsyncSession, run_id: uuid.UUID) -> l
     )
 
     entries: list[LeaderboardEntry] = []
+    cache_rows: list[dict[str, object]] = []
     for index, candidate in enumerate(ranked_candidates, start=1):
         entry = LeaderboardEntry(
             run_id=run_id,
@@ -89,5 +91,14 @@ async def materialize_leaderboard(session: AsyncSession, run_id: uuid.UUID) -> l
         )
         session.add(entry)
         entries.append(entry)
+        cache_rows.append(
+            {
+                "rank": index,
+                "submission_id": str(candidate.submission_id),
+                "final_score": candidate.final_score,
+                "tie_break_metadata": candidate.tie_break_metadata,
+            }
+        )
     await session.flush()
+    write_leaderboard_scoreboard_cache(run_id, cache_rows)
     return entries

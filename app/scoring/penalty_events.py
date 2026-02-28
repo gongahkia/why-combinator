@@ -4,7 +4,8 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import PenaltyEvent
+from app.db.models import PenaltyEvent, Submission
+from app.leaderboard.cache import invalidate_leaderboard_scoreboard_cache
 
 
 async def create_penalty_event_append_only(
@@ -26,4 +27,8 @@ async def create_penalty_event_append_only(
     )
     session.add(row)
     await session.flush()
+    submission = await session.get(Submission, submission_id)
+    if submission is None:
+        raise ValueError("penalty event submission not found")
+    invalidate_leaderboard_scoreboard_cache(submission.run_id)
     return row
