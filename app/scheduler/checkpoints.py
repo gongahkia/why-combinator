@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import os
+import uuid
 from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 
@@ -26,6 +28,10 @@ def load_checkpoint_interval_seconds() -> int:
 
 def load_checkpoint_max_enqueues_per_tick() -> int:
     return int(os.getenv("CHECKPOINT_MAX_ENQUEUES_PER_TICK", "100"))
+
+
+def load_checkpoint_jitter_seconds() -> int:
+    return int(os.getenv("CHECKPOINT_JITTER_SECONDS", "0"))
 
 
 def _weighted_fair_due_order(runs: list[Run]) -> list[Run]:
@@ -54,6 +60,33 @@ def _ensure_utc_timestamp(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def _run_checkpoint_jitter_seconds(
+    run_id: uuid.UUID,
+    *,
+    interval_seconds: int,
+    jitter_window_seconds: int,
+) -> int:
+    capped_window = max(0, min(jitter_window_seconds, max(0, interval_seconds - 1)))
+    if capped_window <= 0:
+        return 0
+    digest = hashlib.sha256(str(run_id).encode("utf-8")).digest()
+    return int.from_bytes(digest[:4], byteorder="big") % (capped_window + 1)
+
+
+def _apply_checkpoint_jitter(
+    base_checkpoint_at: datetime,
+    *,
+    run_id: uuid.UUID,
+    interval_seconds: int,
+) -> datetime:
+    jitter_seconds = _run_checkpoint_jitter_seconds(
+        run_id,
+        interval_seconds=interval_seconds,
+        jitter_window_seconds=load_checkpoint_jitter_seconds(),
+    )
+    return base_checkpoint_at + timedelta(seconds=jitter_seconds)
+
+
 async def _resolve_resume_checkpoint_at(
     session: AsyncSession,
     run: Run,
@@ -79,7 +112,8 @@ async def enqueue_periodic_checkpoint_scores(
     now: datetime | None = None,
 ) -> list[str]:
     current_time = now or datetime.now(UTC)
-    interval = timedelta(seconds=load_checkpoint_interval_seconds())
+    interval_seconds = max(1, load_checkpoint_interval_seconds())
+    interval = timedelta(seconds=interval_seconds)
     scheduled_run_ids: list[str] = []
     leader_id = load_scheduler_leader_id()
     election = await try_acquire_or_renew_scheduler_leader(redis_client, leader_id)
@@ -107,9 +141,14 @@ async def enqueue_periodic_checkpoint_scores(
         key = f"run:{run.id}:next_checkpoint_at"
         next_checkpoint_raw = await redis_client.get(key)
         if next_checkpoint_raw is None:
-            next_checkpoint = await _resolve_resume_checkpoint_at(session, run, interval)
-            if next_checkpoint is None:
+            base_checkpoint_at = await _resolve_resume_checkpoint_at(session, run, interval)
+            if base_checkpoint_at is None:
                 continue
+            next_checkpoint = _apply_checkpoint_jitter(
+                base_checkpoint_at,
+                run_id=run.id,
+                interval_seconds=interval_seconds,
+            )
             await redis_client.set(key, next_checkpoint.isoformat())
         else:
             next_checkpoint = _ensure_utc_timestamp(datetime.fromisoformat(next_checkpoint_raw))
@@ -123,7 +162,12 @@ async def enqueue_periodic_checkpoint_scores(
     for run in _weighted_fair_due_order(due_runs)[:max_enqueues]:
         checkpoint_score.delay(str(run.id), new_trace_id())
         key = f"run:{run.id}:next_checkpoint_at"
-        await redis_client.set(key, (current_time + interval).isoformat())
+        next_checkpoint = _apply_checkpoint_jitter(
+            current_time + interval,
+            run_id=run.id,
+            interval_seconds=interval_seconds,
+        )
+        await redis_client.set(key, next_checkpoint.isoformat())
         scheduled_run_ids.append(str(run.id))
 
     return scheduled_run_ids
