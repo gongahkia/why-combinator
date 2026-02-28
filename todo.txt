@@ -1,4 +1,3 @@
-(A) Add load test script simulating concurrent runs with periodic checkpoint scoring and Redis lock contention +tests +performance
 (A) Add end-to-end test covering challenge create, run start, agent execution, checkpoint scoring, and final leaderboard retrieval +tests +e2e
 (A) Implement run admission control that rejects new runs when worker capacity watermark is exceeded +orchestrator +capacity
 (A) Implement per-run concurrency limiter for simultaneous active hacker containers +sandbox +capacity
