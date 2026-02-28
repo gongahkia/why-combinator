@@ -1,4 +1,3 @@
-(A) Implement periodic checkpoint scheduler that enqueues scoring jobs at fixed interval until run end +scheduler +scoring
 (A) Implement judge scoring worker that requests Codex evaluation using challenge criteria and judge domain prompts +judging +agents
 (A) Implement scoring aggregation engine supporting average, weighted panel, and head-judge override modes +scoring
 (A) Implement threshold gate that marks submission accepted only when quality score >= minimum_quality_threshold +scoring +validation
