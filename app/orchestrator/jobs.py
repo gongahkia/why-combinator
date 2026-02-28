@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from dataclasses import asdict, dataclass
 
+from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
+from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
 
 
@@ -51,3 +53,18 @@ def run_judge_job(run_id: str) -> dict[str, str]:
 
 def run_checkpoint_score_job(run_id: str) -> dict[str, str]:
     return asdict(JobResult(job_type="checkpoint-score", run_id=run_id, status="queued"))
+
+
+def reserve_subagent_spawn_quota(run_id: str, parent_agent_id: str) -> dict[str, str]:
+    redis_client = create_redis_client()
+    try:
+        accepted, remaining = check_and_reserve_subagent_quota(redis_client, run_id, parent_agent_id)
+    finally:
+        redis_client.close()
+    return {
+        "job_type": "subagent-spawn",
+        "run_id": run_id,
+        "parent_agent_id": parent_agent_id,
+        "status": "accepted" if accepted else "quota_exhausted",
+        "spawn_quota_remaining": str(remaining),
+    }

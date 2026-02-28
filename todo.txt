@@ -1,4 +1,3 @@
-(A) Implement per-agent compute quota checks before spawning subagents +budget +agents
 (A) Implement configurable subagent spawn policy with defaults for max depth and max children +agents +orchestrator
 (A) Implement subagent DAG persistence with parent-child edge records and cycle prevention validation +db +agents
 (A) Implement artifact upload API storing metadata in Postgres and binary blobs in local object storage adapter +api +artifacts
