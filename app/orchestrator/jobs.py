@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import shlex
 import uuid
 from dataclasses import asdict, dataclass
 
@@ -15,6 +17,7 @@ from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
 from app.scoring.checkpoint import run_checkpoint_scoring_worker
 from app.security.secrets import build_scoped_model_secret_env
+from app.validation.model_schema import ModelResponseValidationError, validate_hacker_response_json
 
 
 @dataclass
@@ -28,10 +31,17 @@ def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
         return asdict(JobResult(job_type="hacker-run", run_id=run_id, status="runner-disabled"))
 
     image = os.getenv("HACKER_RUNNER_IMAGE", "alpine:3.20")
+    hacker_output_payload = json.dumps(
+        {
+            "summary": f"Run {run_id} MVP summary output",
+            "value_hypothesis": "This MVP should improve challenge KPI throughput.",
+            "artifacts": ["mvp_bundle.zip"],
+        }
+    )
     command = [
         "sh",
         "-lc",
-        f"echo running_hacker_agent_for_run={run_id}",
+        f"printf '%s' {shlex.quote(hacker_output_payload)}",
     ]
     runner = HackerAgentRunner()
     scoped_env = build_scoped_model_secret_env(
@@ -49,6 +59,14 @@ def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
         ),
         limits=load_hacker_runner_limits_from_env(),
     )
+    hacker_schema_valid = "false"
+    hacker_schema_error = ""
+    try:
+        validate_hacker_response_json(result.stdout.strip())
+        hacker_schema_valid = "true"
+    except ModelResponseValidationError as exc:
+        hacker_schema_error = str(exc)
+
     return {
         "job_type": "hacker-run",
         "run_id": run_id,
@@ -57,6 +75,8 @@ def run_hacker_job(run_id: str, trace_id: str | None = None) -> dict[str, str]:
         "exit_code": "" if result.exit_code is None else str(result.exit_code),
         "log_path": result.log_path or "",
         "trace_id": trace_id or "",
+        "hacker_schema_valid": hacker_schema_valid,
+        "hacker_schema_error": hacker_schema_error,
     }
 
 

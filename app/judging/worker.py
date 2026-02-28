@@ -14,6 +14,7 @@ from app.integrations.codex_client import (
     CodexRequest,
 )
 from app.db.models import Challenge, JudgeScore, Run
+from app.validation.model_schema import ModelResponseValidationError, validate_judge_response_json
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,8 @@ def _build_judge_prompt(challenge_prompt: str, judge_profile_prompt: str, submis
         f"Challenge: {challenge_prompt}\n"
         f"Judge profile: {judge_profile_prompt}\n"
         f"Submission summary: {submission_summary}\n"
-        "Return a score between 0 and 1 with a concise rationale."
+        "Return strict JSON with keys score, rationale, confidence.\n"
+        'Example: {"score":0.72,"rationale":"...","confidence":0.61}'
     )
 
 
@@ -37,13 +39,35 @@ def request_codex_evaluation(prompt: str, trace_id: str | None = None) -> CodexJ
     client = CodexClient(max_retries=3, backoff_base_seconds=0.5)
     try:
         response = client.call(CodexRequest(prompt=prompt, temperature=0.1, max_output_tokens=256))
-        digest = hashlib.sha256(response.text.encode("utf-8")).digest()
+        parsed = validate_judge_response_json(response.text)
+        return CodexJudgeResult(
+            score=parsed.score,
+            rationale=parsed.rationale[:500],
+            raw_response={
+                "provider": "codex",
+                "fallback": False,
+                "response": response.raw,
+                "parsed": {
+                    "score": parsed.score,
+                    "rationale": parsed.rationale,
+                    "confidence": parsed.confidence,
+                },
+                "trace_id": trace_id or "",
+            },
+        )
+    except ModelResponseValidationError as exc:
+        digest = hashlib.sha256(prompt.encode("utf-8")).digest()
         score = round((digest[0] / 255.0), 4)
-        rationale = response.text[:500] or "Codex judge evaluation completed."
         return CodexJudgeResult(
             score=score,
-            rationale=rationale,
-            raw_response={"provider": "codex", "fallback": False, "response": response.raw, "trace_id": trace_id or ""},
+            rationale="Codex judge response failed schema validation; deterministic fallback score applied.",
+            raw_response={
+                "provider": "codex",
+                "fallback": True,
+                "error": str(exc),
+                "score": score,
+                "trace_id": trace_id or "",
+            },
         )
     except CodexClientError as exc:
         digest = hashlib.sha256(prompt.encode("utf-8")).digest()
