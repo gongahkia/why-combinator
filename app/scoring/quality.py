@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import statistics
 import uuid
 from dataclasses import dataclass
 
@@ -35,11 +37,31 @@ def normalize_score(raw_score: float, minimum: float = 0.0, maximum: float = 1.0
     return (bounded - minimum) / (maximum - minimum)
 
 
+def load_judge_outlier_dampener_threshold() -> float:
+    return float(os.getenv("JUDGE_OUTLIER_DAMPENER_THRESHOLD", "0.25"))
+
+
+def _outlier_dampener_factor(score: float, median_score: float, threshold: float) -> float:
+    bounded_threshold = max(0.01, min(0.99, threshold))
+    deviation = abs(score - median_score)
+    if deviation <= bounded_threshold:
+        return 1.0
+    normalized_overage = (deviation - bounded_threshold) / max(1e-9, 1.0 - bounded_threshold)
+    return max(0.1, 1.0 - normalized_overage)
+
+
 def score_quality_rubric(outputs: list[JudgeRubricOutput]) -> float:
     if not outputs:
         return 0.0
-    numerator = sum(normalize_score(output.score) * output.rubric_weight for output in outputs)
-    denominator = sum(output.rubric_weight for output in outputs) or 1.0
+    normalized_scores = [normalize_score(output.score) for output in outputs]
+    median_score = statistics.median(normalized_scores)
+    threshold = load_judge_outlier_dampener_threshold()
+    dampened_weights = [
+        output.rubric_weight * _outlier_dampener_factor(score, median_score, threshold)
+        for output, score in zip(outputs, normalized_scores, strict=True)
+    ]
+    numerator = sum(score * weight for score, weight in zip(normalized_scores, dampened_weights, strict=True))
+    denominator = sum(dampened_weights) or 1.0
     return round(numerator / denominator, 6)
 
 
