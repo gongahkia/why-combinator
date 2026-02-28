@@ -1,4 +1,3 @@
-(A) Add integration test for judge profile URL ingestion via curl wrapper with blocked private network targets +tests +ingest
 (A) Add integration test for subagent spawn limits enforcing max depth and max children policies +tests +agents
 (A) Add integration test for budget exhaustion preventing new tasks while allowing scoring finalization tasks +tests +budget
 (A) Add integration test for run timeout watchdog finalizing exactly at iteration deadline +tests +run
