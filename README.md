@@ -3,16 +3,15 @@
 
 # `Why-Combinator`
 
-[CLI](https://aws.amazon.com/what-is/cli/)-first and API-first multi-agent hackathon orchestration platform with integrated market-simulation analytics.
+[CLI](https://aws.amazon.com/what-is/cli/) and [API](https://en.wikipedia.org/wiki/API)-first [multi-agent orchestration](#architecture) platform with [market-simulation](#what-why-combinator-can-do-for-now) analytics.
 
 ## Stack
 
-* *Core Runtime*: [Python](https://www.python.org/), [FastAPI](https://fastapi.tiangolo.com/), [SQLAlchemy](https://www.sqlalchemy.org/), [Celery](https://docs.celeryq.dev/), [Redis](https://redis.io/)
-* *Agent Orchestration*: sandboxed hacker-agent execution, subagent graphing, deterministic replay seeds
-* *Judging + Scoring*: weighted panel scoring, novelty/anti-gaming penalties, checkpoint snapshots, replay diff analytics
-* *Market Simulation Bridge*: [why-combinator](https://github.com/gongahkia/why-combinator) compatibility layer for adoption/churn/runway stress testing
-* *Demo Layer*: [Remotion](https://www.remotion.dev/) 120-second product walkthrough pipeline
-* *Testing*: [pytest](https://docs.pytest.org/)
+* *Script*: [Python](https://www.python.org/), [Remotion](https://www.remotion.dev/) 
+* *Backend*: [FastAPI](https://fastapi.tiangolo.com/), [Celery](https://docs.celeryq.dev/)
+* *DB*: [SQLAlchemy](https://www.sqlalchemy.org/)
+* *Cache*: [Redis](https://redis.io/)
+* *Test*: [pytest](https://docs.pytest.org/)
 
 ## What `Why-Combinator` can do *([for now](https://github.com/gongahkia/why-combinator/issues))*
 
@@ -23,8 +22,8 @@
 * **Realtime ranking**: Materialize leaderboards with cursor stability and segmentation labels.
 * **Artifact governance**: Enforce malware quarantine, signed downloads, and retention policies.
 * **Deterministic replay analytics**: Recompute and diff checkpoint scores with frozen snapshots.
-* **Market simulation overlay**: `POST /runs/{run_id}/analytics/market-simulation` maps run constraints into startup-market stress metrics (adoption, churn, burn, runway, recommendation).
 * **Demo production**: Reproducible 1080p render pipeline with captions, narration sync points, and QA checks.
+* **Market simulation overlay**: Map run constraints into startup-market stress metrics (adoption, churn, burn, runway, recommendation).
 
 ## Usage
 
@@ -66,11 +65,12 @@ $ pytest -q
 
 ## Architecture
 
-- Challenge + run orchestration in `app/api`, `app/orchestrator`, `app/queue`
-- Scoring and replay in `app/scoring`
-- Market-simulation bridge in `app/integrations/why_combinator_bridge.py`
-- Demo pipeline in `demo/remotion`
+...
 
 ## Reference
 
-`Why-Combinator` began as a startup-simulation engine and now serves as an integrated hackathon orchestration + judging + market-simulation platform.
+The name `Why-Combinator` is in reference to the startup accelerator [Y Combinator](https://www.ycombinator.com/). 
+
+<div align="center">
+    <img src="./asset/logo/Y.png" width=25%">
+</div>
