@@ -1,4 +1,3 @@
-(A) Implement Pydantic request/response schemas for all challenge, run, scoring, and artifact endpoints +api +validation
 (A) Implement OpenAPI error model mapping for validation, budget_exhausted, sandbox_failure, and scoring_unavailable codes +api
 (A) Implement transactional submission ingestion that atomically writes submission, artifacts, and initial status +db +submissions
 (A) Implement score event append-only table writes with immutable payload checksum +db +scoring

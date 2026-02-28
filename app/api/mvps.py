@@ -25,6 +25,15 @@ class MVPArtifactDownload(BaseModel):
     download_url: str
 
 
+class ArtifactDownloadMetadataResponse(BaseModel):
+    artifact_id: uuid.UUID
+    submission_id: uuid.UUID
+    artifact_type: str
+    storage_key: str
+    content_hash: str
+    download_url: str
+
+
 class MVPBundleItem(BaseModel):
     submission_id: uuid.UUID
     agent_id: uuid.UUID
@@ -92,3 +101,21 @@ async def download_artifact(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact blob not found")
     filename = artifact_path.name.split("_", 1)[-1]
     return FileResponse(path=artifact_path, filename=filename)
+
+
+@router.get("/artifacts/{artifact_id}/metadata", response_model=ArtifactDownloadMetadataResponse)
+async def get_artifact_metadata(
+    artifact_id: uuid.UUID,
+    session: AsyncSession = Depends(get_db_session),
+) -> ArtifactDownloadMetadataResponse:
+    artifact = await session.get(Artifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact not found")
+    return ArtifactDownloadMetadataResponse(
+        artifact_id=artifact.id,
+        submission_id=artifact.submission_id,
+        artifact_type=str(artifact.artifact_type),
+        storage_key=artifact.storage_key,
+        content_hash=artifact.content_hash,
+        download_url=f"/artifacts/{artifact.id}/download",
+    )
