@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import os
 import tarfile
 import uuid
 import zipfile
@@ -41,6 +42,7 @@ class LocalObjectStorageAdapter:
     def __init__(self, root_path: str) -> None:
         self._root = Path(root_path)
         self._root.mkdir(parents=True, exist_ok=True)
+        (self._root / "blobs").mkdir(parents=True, exist_ok=True)
 
     def put_object(self, submission_id: uuid.UUID, original_filename: str, content: bytes) -> str:
         content_hash = hashlib.sha256(content).hexdigest()
@@ -48,5 +50,15 @@ class LocalObjectStorageAdapter:
         key = f"{submission_id}/{content_hash}_{safe_name}"
         target = self._root / key
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
+        canonical_blob = self._root / "blobs" / content_hash
+        if not canonical_blob.exists():
+            canonical_blob.write_bytes(content)
+
+        if target.exists() or target.is_symlink():
+            target.unlink()
+        try:
+            relative_blob_path = os.path.relpath(canonical_blob, target.parent)
+            target.symlink_to(relative_blob_path)
+        except OSError:
+            target.write_bytes(content)
         return key
