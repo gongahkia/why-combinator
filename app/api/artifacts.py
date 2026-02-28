@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +14,11 @@ from app.api.deps import get_db_session
 from app.db.enums import ArtifactType
 from app.db.models import Artifact, Challenge, Run, Submission
 from app.artifacts.retention import ArtifactRetentionPolicyError, compute_artifact_expiry
+from app.artifacts.retention import is_artifact_expired
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.adapter import ObjectStorageAdapter, build_object_storage_adapter
 from app.storage.local import ArchiveExtractionError, validate_archive_members_safe
+from app.storage.presign import ArtifactPresignError, create_artifact_download_token, validate_artifact_download_token
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
 from app.validation.readme import validate_minimum_readme_content
 from app.validation.value_hypothesis import validate_measurable_value_hypothesis
@@ -47,6 +50,17 @@ class SubmissionValidationResponse(BaseModel):
     submission_id: uuid.UUID
     valid: bool
     errors: list[str]
+
+
+class ArtifactDownloadURLRequest(BaseModel):
+    ttl_seconds: int | None = None
+
+
+class ArtifactDownloadURLResponse(BaseModel):
+    artifact_id: uuid.UUID
+    submission_id: uuid.UUID
+    download_url: str
+    expires_at: datetime
 
 
 @router.post(
@@ -156,6 +170,13 @@ def _read_readme_text(adapter: ObjectStorageAdapter, storage_key: str) -> str | 
     return content.decode("utf-8", errors="ignore")
 
 
+def _artifact_download_filename(storage_key: str) -> str:
+    filename = storage_key.split("/", 1)[-1]
+    if "_" in filename:
+        _, filename = filename.split("_", 1)
+    return filename or "artifact.bin"
+
+
 @router.get(
     "/{submission_id}/validation",
     response_model=SubmissionValidationResponse,
@@ -192,4 +213,79 @@ async def validate_submission_mandatory_requirements(
         submission_id=submission_id,
         valid=len(errors) == 0,
         errors=errors,
+    )
+
+
+@router.post(
+    "/{submission_id}/artifacts/{artifact_id}/download-url",
+    response_model=ArtifactDownloadURLResponse,
+)
+async def create_artifact_download_url(
+    submission_id: uuid.UUID,
+    artifact_id: uuid.UUID,
+    payload: ArtifactDownloadURLRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> ArtifactDownloadURLResponse:
+    artifact = await session.get(Artifact, artifact_id)
+    if artifact is None or artifact.submission_id != submission_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact not found")
+    if is_artifact_expired(artifact.expires_at):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="artifact expired by retention policy")
+
+    try:
+        token, expires_at = create_artifact_download_token(
+            artifact_id=artifact.id,
+            submission_id=submission_id,
+            ttl_seconds=payload.ttl_seconds,
+        )
+    except ArtifactPresignError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    base_url = str(request.base_url).rstrip("/")
+    download_url = f"{base_url}/submissions/artifacts/{artifact.id}/download?token={token}"
+    return ArtifactDownloadURLResponse(
+        artifact_id=artifact.id,
+        submission_id=submission_id,
+        download_url=download_url,
+        expires_at=expires_at,
+    )
+
+
+@router.get("/artifacts/{artifact_id}/download")
+async def download_artifact_with_token(
+    artifact_id: uuid.UUID,
+    token: str,
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    artifact = await session.get(Artifact, artifact_id)
+    if artifact is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact not found")
+    if is_artifact_expired(artifact.expires_at):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="artifact expired by retention policy")
+
+    try:
+        validate_artifact_download_token(
+            token,
+            artifact_id=artifact.id,
+            submission_id=artifact.submission_id,
+        )
+    except ArtifactPresignError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    adapter = build_object_storage_adapter(request.app.state.settings.artifact_storage_path)
+    try:
+        content = adapter.get_object(artifact.storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="artifact blob not found") from exc
+
+    filename = _artifact_download_filename(artifact.storage_key)
+    return Response(
+        content=content,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f'attachment; filename=\"{filename}\"',
+            "Cache-Control": "no-store",
+        },
     )

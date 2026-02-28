@@ -41,6 +41,8 @@ def compute_artifact_expiry(
 def is_artifact_expired(expires_at: datetime | None, now: datetime | None = None) -> bool:
     if expires_at is None:
         return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=UTC)
     current_time = now or datetime.now(UTC)
     if current_time.tzinfo is None:
         current_time = current_time.replace(tzinfo=UTC)
