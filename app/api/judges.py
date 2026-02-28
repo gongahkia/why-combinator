@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.db.models import Challenge, JudgeProfile
+from app.ingest.allowlist import URLAllowlistError, assert_url_allowed_for_challenge
 from app.ingest.profile_parser import ProfileParseError, parse_profile_payload
 from app.ingest.sanitize import URLSanitizationError, sanitize_ingestion_url
 from app.ingest.url_cache import fetch_url_content_cached
@@ -212,6 +213,7 @@ async def register_judge_profile_url(
 ) -> list[JudgeProfileResponse]:
     try:
         sanitized_url = sanitize_ingestion_url(payload.url)
+        assert_url_allowed_for_challenge(challenge_id, sanitized_url)
         content = await fetch_url_content_cached(
             request.app.state.redis,
             sanitized_url,
@@ -222,6 +224,8 @@ async def register_judge_profile_url(
         source_format, parsed = parse_profile_payload(content)
     except URLSanitizationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url not allowed: {exc}") from exc
+    except URLAllowlistError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url blocked by allowlist: {exc}") from exc
     except URLFetchError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url fetch failed: {exc}") from exc
     except ProfileParseError as exc:
