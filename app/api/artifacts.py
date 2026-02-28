@@ -15,6 +15,16 @@ from app.storage.local import LocalObjectStorageAdapter
 
 router = APIRouter(prefix="/submissions", tags=["artifacts"])
 
+ARTIFACT_TYPE_ALIASES: dict[str, ArtifactType] = {
+    "web_app_bundle": ArtifactType.WEB_BUNDLE,
+    "web_bundle": ArtifactType.WEB_BUNDLE,
+    "cli_package": ArtifactType.CLI_PACKAGE,
+    "api_service_bundle": ArtifactType.API_SERVICE,
+    "api_service": ArtifactType.API_SERVICE,
+    "notebook_file": ArtifactType.NOTEBOOK,
+    "notebook": ArtifactType.NOTEBOOK,
+}
+
 
 class ArtifactUploadResponse(BaseModel):
     id: uuid.UUID
@@ -34,13 +44,21 @@ class ArtifactUploadResponse(BaseModel):
 async def upload_artifact(
     submission_id: uuid.UUID,
     request: Request,
-    artifact_type: ArtifactType,
+    artifact_type: str,
     file: UploadFile = File(...),
     session: AsyncSession = Depends(get_db_session),
 ) -> ArtifactUploadResponse:
     submission = await session.get(Submission, submission_id)
     if submission is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="submission not found")
+
+    normalized_type = ARTIFACT_TYPE_ALIASES.get(artifact_type.strip().lower())
+    if normalized_type is None:
+        allowed = ", ".join(sorted(ARTIFACT_TYPE_ALIASES))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"unsupported artifact_type; expected one of: {allowed}",
+        )
 
     content = await file.read()
     if not content:
@@ -51,7 +69,7 @@ async def upload_artifact(
     content_hash = hashlib.sha256(content).hexdigest()
     artifact = Artifact(
         submission_id=submission_id,
-        artifact_type=artifact_type,
+        artifact_type=normalized_type,
         storage_key=storage_key,
         content_hash=content_hash,
     )
