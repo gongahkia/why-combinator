@@ -1,4 +1,3 @@
-(A) Implement risk appetite policy mapper translating conservative/balanced/aggressive into exploration constraints +orchestrator +policy
 (A) Implement idea complexity slider mapper converting value into target count, depth, and time-allocation strategy +orchestrator +policy
 (A) Implement adaptive planner that reallocates remaining budget between new ideas and refinement each checkpoint +orchestrator +budget
 (A) Implement queue deduplication keys preventing duplicate score jobs for same submission and checkpoint +queue +scoring
