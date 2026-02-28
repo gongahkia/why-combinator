@@ -7,23 +7,27 @@
 
 ## Stack
 
-* *Script*: [Python](https://www.python.org/), [Remotion](https://www.remotion.dev/) 
-* *Backend*: [FastAPI](https://fastapi.tiangolo.com/), [Celery](https://docs.celeryq.dev/)
-* *DB*: [SQLAlchemy](https://www.sqlalchemy.org/)
+* *Script*: [Python](https://www.python.org/), [TypeScript](https://www.typescriptlang.org/), [Remotion](https://www.remotion.dev/), [React](https://react.dev/)
+* *Backend*: [FastAPI](https://fastapi.tiangolo.com/), [uvicorn](https://www.uvicorn.org/), [Celery](https://docs.celeryq.dev/), [asyncpg](https://magicstack.github.io/asyncpg/), [Pydantic](https://docs.pydantic.dev/), [httpx](https://www.python-httpx.org/), [Docker](https://www.docker.com/)
+* *DB*: [PostgreSQL](https://www.postgresql.org/), [SQLAlchemy](https://www.sqlalchemy.org/), [Alembic](https://alembic.sqlalchemy.org/), [aiosqlite](https://aiosqlite.omnilib.dev/), [TinyDB](https://tinydb.readthedocs.io/)
 * *Cache*: [Redis](https://redis.io/)
 * *Test*: [pytest](https://docs.pytest.org/)
 
 ## What `Why-Combinator` can do *([for now](https://github.com/gongahkia/why-combinator/issues))*
 
 * **Hackathon control plane**: Create challenges, configure risk/complexity controls, define iteration windows, and enforce minimum quality bars.
-* **Parallel hacker execution**: Run multi-agent hacker flows with sandbox isolation, admission controls, and subagent spawning.
+* **Parallel hacker execution**: Run multi-agent hacker flows with Docker-sandboxed, network-restricted containers, admission controls, and subagent spawning.
 * **Judge system orchestration**: Ingest judge profiles via JSON/YAML/CSV/URL, enforce versioning, and apply domain-aware scoring.
 * **Anti-convergence scoring**: Compute novelty, similarity penalties, and too-safe penalties with replay-safe checkpoint snapshots.
-* **Realtime ranking**: Materialize leaderboards with cursor stability and segmentation labels.
-* **Artifact governance**: Enforce malware quarantine, signed downloads, and retention policies.
+* **Realtime ranking**: Materialize leaderboards with cursor stability and segmentation labels; stream updates via WebSocket and SSE.
+* **Artifact governance**: Enforce malware quarantine, presigned downloads, and configurable retention policies with local filesystem or S3 backends.
 * **Deterministic replay analytics**: Recompute and diff checkpoint scores with frozen snapshots.
 * **Demo production**: Reproducible 1080p render pipeline with captions, narration sync points, and QA checks.
 * **Market simulation overlay**: Map run constraints into startup-market stress metrics (adoption, churn, burn, runway, recommendation).
+* **TypeScript SDK generation**: Auto-generate a typed API client from the live OpenAPI spec.
+* **Idempotency-safe operations**: Keyed idempotency on all state-mutating endpoints prevents duplicate side effects on retry.
+* **Rate limiting and quota enforcement**: Per-user token-bucket rate limits and soft quota caps on challenges, runs, and artifact storage.
+* **Distributed scheduler**: Leader-election-based scheduler with heartbeat monitoring drives checkpoint intervals, run timeouts, and orphan recovery.
 
 ## Usage
 
@@ -39,16 +43,25 @@ $ pip install -e .
 ```bash
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/hackathon
 REDIS_URL=redis://localhost:6379/0
+ARTIFACT_STORAGE_BACKEND=local                        # or s3
+MODEL_API_KEY=<openai-key>                            # required for hacker/judge LLM calls
 WHY_COMBINATOR_REPO_PATH=/absolute/path/to/why-combinator  # optional bridge override
 ```
 
-3. Run the API service.
+3. Apply database migrations.
+
+```console
+$ alembic upgrade head
+```
+
+4. Start the API service and Celery workers (two separate terminals).
 
 ```console
 $ uvicorn app.main:app --reload
+$ celery -A app.queue.celery_app worker --loglevel=info -Q hacker-run,judge-run,checkpoint-score,checkpoint-backfill,outbox-relay,scheduler-monitor,run-heartbeat-watchdog,sandbox-cleanup,run-complete,score-submission,recovery
 ```
 
-4. Typical flow.
+5. Typical flow.
 
 ```console
 $ curl -X POST http://localhost:8000/challenges ...
@@ -57,7 +70,7 @@ $ curl -X POST http://localhost:8000/runs/<run_id>/analytics/market-simulation -
 $ curl http://localhost:8000/runs/<run_id>/analytics/replay/diff
 ```
 
-5. Run tests.
+6. Run tests.
 
 ```console
 $ pytest -q
