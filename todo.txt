@@ -1,4 +1,3 @@
-(B) Implement typed client SDK generation step from OpenAPI schema and publishable package output +api +sdk
 (B) Implement background cleanup worker deleting expired sandbox volumes and temporary workdirs +sandbox +maintenance
 (B) Implement artifact retention policy engine with per-challenge TTL overrides +artifacts +storage
 (B) Implement storage adapter abstraction supporting local filesystem and S3-compatible backends +storage +artifacts
