@@ -14,12 +14,17 @@ def load_non_production_penalty_value() -> float:
     return float(os.getenv("NON_PRODUCTION_PENALTY_VALUE", "0.3"))
 
 
+def load_non_production_penalty_multiplier() -> float:
+    return float(os.getenv("NON_PRODUCTION_PENALTY_MULTIPLIER", "2.0"))
+
+
 async def generate_non_production_penalties(
     session: AsyncSession,
     run_id: uuid.UUID,
     checkpoint_id: str = "run_end",
 ) -> list[PenaltyEvent]:
     penalty_value = load_non_production_penalty_value()
+    heavy_multiplier = load_non_production_penalty_multiplier()
     agent_stmt: Select[tuple[uuid.UUID]] = select(Agent.id).where(Agent.run_id == run_id)
     agent_ids = (await session.execute(agent_stmt)).scalars().all()
 
@@ -52,7 +57,7 @@ async def generate_non_production_penalties(
                 checkpoint_id=checkpoint_id,
                 source="run_completion_non_production",
                 penalty_type="non_production",
-                value=penalty_value,
+                value=penalty_value * heavy_multiplier,
                 explanation="agent produced zero accepted submissions by run end",
             )
             session.add(event)
