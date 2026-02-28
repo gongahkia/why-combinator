@@ -11,6 +11,7 @@ from app.api.artifacts import router as artifacts_router
 from app.api.auth import AuthMiddleware
 from app.api.challenge_keys import router as challenge_keys_router
 from app.api.challenges import router as challenges_router
+from app.api.exports import router as exports_router
 from app.api.judges import router as judges_router
 from app.api.leaderboard import router as leaderboard_router
 from app.api.mvps import router as mvps_router
@@ -59,6 +60,7 @@ app.include_router(leaderboard_router)
 app.include_router(mvps_router)
 app.include_router(timeline_router)
 app.include_router(submissions_router)
+app.include_router(exports_router)
 
 
 @app.get("/", tags=["infra"])
