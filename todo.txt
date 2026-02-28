@@ -1,4 +1,3 @@
-(A) Implement readiness endpoint verifying migration version and model provider credential presence +api +infra
 (A) Implement graceful shutdown logic draining workers and marking in-flight tasks recoverable +queue +reliability
 (A) Implement recovery job that requeues orphaned in-flight tasks after worker crash detection +queue +reliability
 (A) Implement secure container log capture with size limits and per-task retention policies +sandbox +observability
