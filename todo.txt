@@ -1,4 +1,3 @@
-(A) Implement dead-letter queue handling for failed agent tasks with capped retries and failure reason persistence +queue +reliability
 (A) Implement cancellation endpoint that stops active containers, revokes queued jobs, and marks run canceled +api +run
 (A) Implement run timeout watchdog that force-finalizes run at iteration window boundary +scheduler +run
 (A) Implement judge profile schema validator enforcing domain, scoring style, and optional head_judge flag constraints +judging +validation

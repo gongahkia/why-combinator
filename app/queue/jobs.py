@@ -6,6 +6,7 @@ from celery import shared_task
 
 from app.orchestrator.jobs import run_checkpoint_score_job, run_complete_run_job, run_hacker_job, run_judge_job
 from app.queue.budget import create_redis_client, reserve_budget, task_cost_from_env
+from app.queue.dead_letter import persist_dead_letter_event
 from app.queue.dedup import claim_score_job_dedup_key
 
 
@@ -29,20 +30,34 @@ def _checkpoint_run_lock_key(run_id: str) -> str:
     return f"lock:checkpoint-score:{run_id}"
 
 
-@shared_task(name="app.queue.jobs.hacker_run", bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
+@shared_task(name="app.queue.jobs.hacker_run", bind=True)
 def hacker_run(self, run_id: str) -> dict[str, str]:
-    accepted, payload = _with_budget_guard(run_id, "hacker-run", default_cost=10)
-    if not accepted:
-        return payload
-    return run_hacker_job(run_id)
+    max_retries = 3
+    try:
+        accepted, payload = _with_budget_guard(run_id, "hacker-run", default_cost=10)
+        if not accepted:
+            return payload
+        return run_hacker_job(run_id)
+    except Exception as exc:  # noqa: BLE001
+        if self.request.retries >= max_retries:
+            persist_dead_letter_event("hacker-run", run_id, str(exc), self.request.retries)
+            return {"job_type": "hacker-run", "run_id": run_id, "status": "dead_lettered", "reason": str(exc)}
+        raise self.retry(exc=exc, countdown=2**self.request.retries, max_retries=max_retries)
 
 
-@shared_task(name="app.queue.jobs.judge_run", bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
+@shared_task(name="app.queue.jobs.judge_run", bind=True)
 def judge_run(self, run_id: str) -> dict[str, str]:
-    accepted, payload = _with_budget_guard(run_id, "judge-run", default_cost=5)
-    if not accepted:
-        return payload
-    return run_judge_job(run_id)
+    max_retries = 3
+    try:
+        accepted, payload = _with_budget_guard(run_id, "judge-run", default_cost=5)
+        if not accepted:
+            return payload
+        return run_judge_job(run_id)
+    except Exception as exc:  # noqa: BLE001
+        if self.request.retries >= max_retries:
+            persist_dead_letter_event("judge-run", run_id, str(exc), self.request.retries)
+            return {"job_type": "judge-run", "run_id": run_id, "status": "dead_lettered", "reason": str(exc)}
+        raise self.retry(exc=exc, countdown=2**self.request.retries, max_retries=max_retries)
 
 
 @shared_task(
