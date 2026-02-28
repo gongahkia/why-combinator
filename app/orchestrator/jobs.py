@@ -13,6 +13,7 @@ from app.orchestrator.run_completion import complete_run
 from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
 from app.queue.budget import create_redis_client
 from app.sandbox.runner import HackerAgentRunSpec, HackerAgentRunner, load_hacker_runner_limits_from_env
+from app.security.secrets import build_scoped_model_secret_env
 
 
 @dataclass
@@ -34,12 +35,16 @@ def run_hacker_job(run_id: str) -> dict[str, str]:
         f"echo running_hacker_agent_for_run={run_id}",
     ]
     runner = HackerAgentRunner()
+    scoped_env = build_scoped_model_secret_env(
+        base_env={"RUN_ID": run_id},
+        ttl_seconds=int(os.getenv("MODEL_API_KEY_TTL_SECONDS", "300")),
+    )
     result = runner.run(
         spec=HackerAgentRunSpec(
             agent_id=run_id,
             image=image,
             command=command,
-            env={"RUN_ID": run_id},
+            env=scoped_env,
         ),
         limits=load_hacker_runner_limits_from_env(),
     )
