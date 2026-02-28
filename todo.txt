@@ -1,4 +1,3 @@
-(A) Implement anti-gaming detector for template-cloned submissions with shallow textual mutations +novelty +penalties
 (A) Implement prompt-injection detector on ingested judge profiles and challenge URLs prior to parsing +security +ingest
 (A) Implement URL content fetch allowlist override setting scoped per challenge for controlled external ingestion +ingest +security
 (A) Implement isolated git checkout worker for repository-based artifacts with commit pinning and shallow clone +artifacts +sandbox

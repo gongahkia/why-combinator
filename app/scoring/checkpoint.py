@@ -11,11 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Artifact, Challenge, Run, ScoreEvent, Submission
 from app.judging.worker import run_judge_scoring_worker
 from app.leaderboard.materializer import materialize_leaderboard
+from app.scoring.anti_gaming import detect_template_clone_penalty
 from app.scoring.checkpoint_snapshot import capture_checkpoint_snapshot
 from app.scoring.events import create_score_event_idempotent
 from app.scoring.feasibility import RuntimeValidationSignal, score_feasibility
 from app.scoring.final_score import ScoreComponents, compose_final_score
 from app.scoring.novelty_normalization import normalize_novelty_score
+from app.scoring.penalty_events import create_penalty_event_append_only
 from app.scoring.quality import score_submission_quality
 from app.scoring.similarity import score_submission_similarity
 from app.scoring.threshold import apply_quality_threshold_gate
@@ -124,8 +126,10 @@ async def run_checkpoint_scoring_worker(
         artifact_count = (await session.execute(artifact_count_stmt)).scalar_one()
         quality_score = await score_submission_quality(session, submission.id, checkpoint_id=checkpoint_id)
         similarity_score = await score_submission_similarity(session, submission.id)
+        anti_gaming_score = await detect_template_clone_penalty(session, submission.id)
         too_safe_score = await score_too_safe_penalty(session, submission.id)
         novelty_score = normalize_novelty_score(1.0 - similarity_score.max_similarity)
+        combined_similarity_penalty = max(similarity_score.max_similarity, anti_gaming_score.penalty)
         feasibility_score = score_feasibility(
             runtime_signals=[
                 RuntimeValidationSignal(
@@ -143,7 +147,7 @@ async def run_checkpoint_scoring_worker(
             novelty=novelty_score,
             feasibility=feasibility_score,
             criteria=criteria_score,
-            similarity_penalty=similarity_score.max_similarity,
+            similarity_penalty=combined_similarity_penalty,
             too_safe_penalty=too_safe_score.too_safe_penalty,
             non_production_penalty=0.0,
         )
@@ -152,6 +156,10 @@ async def run_checkpoint_scoring_worker(
         payload["effective_config_checksum"] = effective_config_checksum
         payload["quality_gate_passed"] = quality_gate_passed
         payload["trace_id"] = trace_id or ""
+        payload["anti_gaming_penalty"] = anti_gaming_score.penalty
+        payload["anti_gaming_matched_submission_id"] = (
+            str(anti_gaming_score.matched_submission_id) if anti_gaming_score.matched_submission_id else None
+        )
 
         await create_score_event_idempotent(
             session=session,
@@ -165,6 +173,19 @@ async def run_checkpoint_scoring_worker(
             payload=payload,
             idempotency_key=f"checkpoint-score:{checkpoint_id}:{submission.id}",
         )
+        if anti_gaming_score.penalty > 0:
+            await create_penalty_event_append_only(
+                session=session,
+                submission_id=submission.id,
+                checkpoint_id=checkpoint_id,
+                source="anti_gaming_detector",
+                penalty_type="template_clone_shallow_mutation",
+                value=anti_gaming_score.penalty,
+                explanation=(
+                    "submission text shows high overlap with peer submission "
+                    f"{anti_gaming_score.matched_submission_id}"
+                ),
+            )
         scored_submissions += 1
 
     leaderboard_entries = await materialize_leaderboard(session, run_id)
