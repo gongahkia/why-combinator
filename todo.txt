@@ -1,4 +1,3 @@
-(A) Implement idempotency keys for submission create API and scoring event writes +api +db
 (A) Implement optimistic locking on mutable run config rows to prevent concurrent weight update conflicts +db +api
 (A) Implement Redis distributed locks around checkpoint scoring batches per run +queue +scoring
 (A) Implement dead-letter queue handling for failed agent tasks with capped retries and failure reason persistence +queue +reliability

@@ -215,3 +215,13 @@ class LeaderboardEntry(TimestampMixin, Base):
 
     run: Mapped[Run] = relationship(back_populates="leaderboard_entries")
     submission: Mapped[Submission] = relationship(back_populates="leaderboard_entries")
+
+
+class IdempotencyKey(TimestampMixin, Base):
+    __tablename__ = "idempotency_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    scope: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+    response_payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)

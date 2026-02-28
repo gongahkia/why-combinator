@@ -14,6 +14,7 @@ from app.api.leaderboard import router as leaderboard_router
 from app.api.mvps import router as mvps_router
 from app.api.runs import router as runs_router
 from app.api.scoring import router as scoring_router
+from app.api.submissions import router as submissions_router
 from app.api.timeline import router as timeline_router
 from app.config import Settings, load_settings
 
@@ -53,6 +54,7 @@ app.include_router(artifacts_router)
 app.include_router(leaderboard_router)
 app.include_router(mvps_router)
 app.include_router(timeline_router)
+app.include_router(submissions_router)
 
 
 @app.get("/", tags=["infra"])
