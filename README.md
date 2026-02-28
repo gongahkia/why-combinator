@@ -18,16 +18,10 @@
 * **Hackathon control plane**: Create challenges, configure risk/complexity controls, define iteration windows, and enforce minimum quality bars.
 * **Parallel hacker execution**: Run multi-agent hacker flows with Docker-sandboxed, network-restricted containers, admission controls, and subagent spawning.
 * **Judge system orchestration**: Ingest judge profiles via JSON/YAML/CSV/URL, enforce versioning, and apply domain-aware scoring.
-* **Anti-convergence scoring**: Compute novelty, similarity penalties, and too-safe penalties with replay-safe checkpoint snapshots.
-* **Realtime ranking**: Materialize leaderboards with cursor stability and segmentation labels; stream updates via WebSocket and SSE.
-* **Artifact governance**: Enforce malware quarantine, presigned downloads, and configurable retention policies with local filesystem or S3 backends.
 * **Deterministic replay analytics**: Recompute and diff checkpoint scores with frozen snapshots.
-* **Demo production**: Reproducible 1080p render pipeline with captions, narration sync points, and QA checks.
+* **Demo production**: Reproducible 1080p video render pipeline with captions, narration sync points, and QA checks.
 * **Market simulation overlay**: Map run constraints into startup-market stress metrics (adoption, churn, burn, runway, recommendation).
-* **TypeScript SDK generation**: Auto-generate a typed API client from the live OpenAPI spec.
-* **Idempotency-safe operations**: Keyed idempotency on all state-mutating endpoints prevents duplicate side effects on retry.
 * **Rate limiting and quota enforcement**: Per-user token-bucket rate limits and soft quota caps on challenges, runs, and artifact storage.
-* **Distributed scheduler**: Leader-election-based scheduler with heartbeat monitoring drives checkpoint intervals, run timeouts, and orphan recovery.
 
 ## Usage
 
