@@ -11,6 +11,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from app.sandbox.network_policy import (
+    enforce_hacker_runner_network_policy,
+    load_hacker_runner_network_mode,
+    metadata_sinkhole_hosts,
+)
 
 @dataclass(frozen=True)
 class SandboxLimits:
@@ -145,6 +150,7 @@ class HackerAgentRunner:
     def run(self, spec: HackerAgentRunSpec, limits: SandboxLimits) -> HackerAgentRunResult:
         container_name = f"hacker-agent-{spec.agent_id[:12]}-{uuid.uuid4().hex[:8]}"
         ephemeral_workdir = tempfile.mkdtemp(prefix=f"{container_name}-")
+        network_mode = load_hacker_runner_network_mode()
         docker_cmd = [
             self._docker_bin,
             "run",
@@ -152,7 +158,7 @@ class HackerAgentRunner:
             "--name",
             container_name,
             "--network",
-            "none",
+            network_mode,
             "--read-only",
             "--tmpfs",
             "/tmp:rw,noexec,nosuid,size=256m",
@@ -165,12 +171,37 @@ class HackerAgentRunner:
             "--memory",
             f"{limits.memory_mb}m",
         ]
+        for host in metadata_sinkhole_hosts():
+            docker_cmd.extend(["--add-host", f"{host}:127.0.0.1"])
         for key, value in spec.env.items():
             docker_cmd.extend(["-e", f"{key}={value}"])
         docker_cmd.append(spec.image)
         docker_cmd.extend(spec.command)
 
         try:
+            try:
+                enforce_hacker_runner_network_policy(network_mode)
+            except ValueError as exc:
+                max_log_bytes = _load_sandbox_log_max_bytes()
+                stderr = _redact_sensitive_values(_truncate_output(str(exc), max_log_bytes), spec.env)
+                log_path = _persist_sandbox_log(
+                    container_name=container_name,
+                    task_type=spec.task_type,
+                    stdout="",
+                    stderr=stderr,
+                    exit_code=1,
+                    timed_out=False,
+                    trace_id=spec.trace_id,
+                )
+                return HackerAgentRunResult(
+                    container_name=container_name,
+                    exit_code=1,
+                    timed_out=False,
+                    startup_timed_out=False,
+                    stdout="",
+                    stderr=stderr,
+                    log_path=log_path,
+                )
             startup_ok, startup_error = self._probe_container_startup(spec.image, limits.startup_timeout_seconds)
             if not startup_ok:
                 max_log_bytes = _load_sandbox_log_max_bytes()
