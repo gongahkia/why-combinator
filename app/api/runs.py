@@ -84,6 +84,8 @@ async def start_run(
     baseline_rows = await run_baseline_idea_generator_job(session, run, challenge)
     await session.commit()
     await session.refresh(run)
+    budget_key = f"run:{run.id}:budget_remaining"
+    await request.app.state.redis.setnx(budget_key, request.app.state.settings.default_run_budget_units)
 
     event = {
         "event_type": "run_started",
@@ -92,6 +94,7 @@ async def start_run(
         "challenge_id": str(challenge_id),
         "config_snapshot": config_snapshot,
         "baseline_vector_count": len(baseline_rows),
+        "budget_key": budget_key,
     }
     await request.app.state.redis.publish("run_events", json.dumps(event))
 
