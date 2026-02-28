@@ -25,6 +25,10 @@ def _with_budget_guard(run_id: str, task_name: str, default_cost: int) -> tuple[
     return True, {}
 
 
+def _checkpoint_run_lock_key(run_id: str) -> str:
+    return f"lock:checkpoint-score:{run_id}"
+
+
 @shared_task(name="app.queue.jobs.hacker_run", bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 3})
 def hacker_run(self, run_id: str) -> dict[str, str]:
     accepted, payload = _with_budget_guard(run_id, "hacker-run", default_cost=10)
@@ -52,7 +56,20 @@ def checkpoint_score(self, run_id: str) -> dict[str, str]:
     accepted, payload = _with_budget_guard(run_id, "checkpoint-score", default_cost=2)
     if not accepted:
         return payload
-    return run_checkpoint_score_job(run_id)
+    redis_client = create_redis_client()
+    lock = redis_client.lock(_checkpoint_run_lock_key(run_id), timeout=60, blocking=False)
+    if not lock.acquire(blocking=False):
+        redis_client.close()
+        return {
+            "job_type": "checkpoint-score",
+            "run_id": run_id,
+            "status": "lock_not_acquired",
+        }
+    try:
+        return run_checkpoint_score_job(run_id)
+    finally:
+        lock.release()
+        redis_client.close()
 
 
 @shared_task(

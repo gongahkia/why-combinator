@@ -1,4 +1,3 @@
-(A) Implement Redis distributed locks around checkpoint scoring batches per run +queue +scoring
 (A) Implement dead-letter queue handling for failed agent tasks with capped retries and failure reason persistence +queue +reliability
 (A) Implement cancellation endpoint that stops active containers, revokes queued jobs, and marks run canceled +api +run
 (A) Implement run timeout watchdog that force-finalizes run at iteration window boundary +scheduler +run
