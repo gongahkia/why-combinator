@@ -9,9 +9,12 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.scheduler.checkpoints import enqueue_periodic_checkpoint_scores
+from app.scheduler.leader_election import (
+    SCHEDULER_LEADER_HEARTBEAT_KEY,
+    publish_scheduler_leader_heartbeat,
+)
 
 
-SCHEDULER_LEADER_HEARTBEAT_KEY = "scheduler:leader:heartbeat"
 SCHEDULER_LEADER_FAILOVER_REQUEST_KEY = "scheduler:leader:failover_requested"
 
 
@@ -34,19 +37,6 @@ class SchedulerHeartbeatMonitorResult:
     failover_triggered: bool
     reason: str
     scheduled_run_ids: list[str]
-
-
-async def publish_scheduler_leader_heartbeat(
-    redis_client: Redis,
-    leader_id: str,
-    now: datetime | None = None,
-) -> None:
-    current_time = _ensure_utc_timestamp(now or datetime.now(UTC))
-    payload = {
-        "leader_id": leader_id,
-        "heartbeat_at": current_time.isoformat(),
-    }
-    await redis_client.set(SCHEDULER_LEADER_HEARTBEAT_KEY, json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
 
 def _parse_heartbeat_timestamp(raw_payload: str) -> datetime | None:

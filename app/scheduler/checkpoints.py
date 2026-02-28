@@ -13,6 +13,11 @@ from app.db.enums import RunState
 from app.db.models import CheckpointSnapshot, Run
 from app.observability.trace import new_trace_id
 from app.queue.jobs import checkpoint_score
+from app.scheduler.leader_election import (
+    load_scheduler_leader_id,
+    publish_scheduler_leader_heartbeat,
+    try_acquire_or_renew_scheduler_leader,
+)
 
 
 def load_checkpoint_interval_seconds() -> int:
@@ -76,6 +81,11 @@ async def enqueue_periodic_checkpoint_scores(
     current_time = now or datetime.now(UTC)
     interval = timedelta(seconds=load_checkpoint_interval_seconds())
     scheduled_run_ids: list[str] = []
+    leader_id = load_scheduler_leader_id()
+    election = await try_acquire_or_renew_scheduler_leader(redis_client, leader_id)
+    if not election.is_leader:
+        return []
+    await publish_scheduler_leader_heartbeat(redis_client, leader_id, now=current_time)
 
     running_stmt: Select[tuple[Run]] = (
         select(Run)

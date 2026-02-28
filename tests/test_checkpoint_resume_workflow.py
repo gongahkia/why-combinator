@@ -17,8 +17,23 @@ class _FakeAsyncRedis:
     async def get(self, key: str) -> str | None:
         return self.store.get(key)
 
-    async def set(self, key: str, value: str) -> None:
+    async def set(
+        self,
+        key: str,
+        value: str,
+        ex: int | None = None,  # noqa: ARG002
+        nx: bool | None = None,
+    ) -> bool | None:
+        if nx:
+            if key in self.store:
+                return False
+            self.store[key] = value
+            return True
         self.store[key] = value
+        return None
+
+    async def expire(self, key: str, seconds: int) -> bool:  # noqa: ARG002
+        return key in self.store
 
 
 @pytest.mark.asyncio
