@@ -7,8 +7,9 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import AgentRole, RunState, SubmissionState
-from app.db.models import Agent, Run, Submission
+from app.db.models import Agent, Challenge, Run, Submission
 from app.leaderboard.materializer import materialize_leaderboard
+from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.scoring.penalties import generate_non_production_penalties
 
 
@@ -16,6 +17,8 @@ async def complete_run(session: AsyncSession, run_id: uuid.UUID) -> dict[str, in
     run = await session.get(Run, run_id)
     if run is None:
         raise ValueError("run not found")
+    challenge = await session.get(Challenge, run.challenge_id)
+    challenge_prompt = challenge.prompt if challenge is not None else "unknown challenge"
 
     hacker_stmt: Select[tuple[Agent]] = select(Agent).where(
         Agent.run_id == run_id,
@@ -36,8 +39,15 @@ async def complete_run(session: AsyncSession, run_id: uuid.UUID) -> dict[str, in
                 run_id=run_id,
                 agent_id=hacker.id,
                 state=SubmissionState.REJECTED,
-                value_hypothesis="auto-generated attempt: no submission provided before run close",
-                summary="auto-generated attempt object for non-producing hacker agent",
+                value_hypothesis=(
+                    "auto-generated attempt: no submission provided before run close"
+                ),
+                summary=generate_submission_semantic_summary(
+                    challenge_prompt=challenge_prompt,
+                    value_hypothesis=(
+                        "auto-generated attempt: no submission provided before run close"
+                    ),
+                ),
             )
         )
         auto_attempts_created += 1

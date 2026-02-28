@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
 import base64
 import hashlib
+import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -17,7 +17,8 @@ from app.db.idempotency import (
 )
 from app.db.models import Agent, Run, Submission
 from app.db.enums import ArtifactType
-from app.db.models import Artifact
+from app.db.models import Artifact, Challenge
+from app.orchestrator.submission_summary import generate_submission_semantic_summary
 from app.storage.local import LocalObjectStorageAdapter
 
 router = APIRouter(prefix="/runs", tags=["submissions"])
@@ -26,7 +27,6 @@ router = APIRouter(prefix="/runs", tags=["submissions"])
 class SubmissionCreateRequest(BaseModel):
     agent_id: uuid.UUID
     value_hypothesis: str = Field(min_length=5)
-    summary: str = Field(min_length=10)
 
 
 class SubmissionResponse(BaseModel):
@@ -51,7 +51,6 @@ class ArtifactIngestInput(BaseModel):
 class SubmissionIngestRequest(BaseModel):
     agent_id: uuid.UUID
     value_hypothesis: str = Field(min_length=5)
-    summary: str = Field(min_length=10)
     artifacts: list[ArtifactIngestInput] = Field(min_length=1)
 
 
@@ -70,6 +69,9 @@ async def create_submission(
     run = await session.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    challenge = await session.get(Challenge, run.challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
     agent = await session.get(Agent, payload.agent_id)
     if agent is None or agent.run_id != run_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="agent does not belong to run")
@@ -82,11 +84,15 @@ async def create_submission(
         if existing is not None:
             return SubmissionResponse.model_validate(existing)
 
+    summary = generate_submission_semantic_summary(
+        challenge_prompt=challenge.prompt,
+        value_hypothesis=payload.value_hypothesis,
+    )
     submission = Submission(
         run_id=run_id,
         agent_id=payload.agent_id,
         value_hypothesis=payload.value_hypothesis,
-        summary=payload.summary,
+        summary=summary,
     )
     session.add(submission)
     await session.flush()
@@ -113,17 +119,25 @@ async def ingest_submission_transactional(
     run = await session.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    challenge = await session.get(Challenge, run.challenge_id)
+    if challenge is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="challenge not found")
     agent = await session.get(Agent, payload.agent_id)
     if agent is None or agent.run_id != run_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="agent does not belong to run")
 
     adapter = LocalObjectStorageAdapter(request.app.state.settings.artifact_storage_path)
+    summary = generate_submission_semantic_summary(
+        challenge_prompt=challenge.prompt,
+        value_hypothesis=payload.value_hypothesis,
+        artifact_descriptors=[f"{artifact.artifact_type.value}:{artifact.filename}" for artifact in payload.artifacts],
+    )
     async with session.begin():
         submission = Submission(
             run_id=run_id,
             agent_id=payload.agent_id,
             value_hypothesis=payload.value_hypothesis,
-            summary=payload.summary,
+            summary=summary,
         )
         session.add(submission)
         await session.flush()

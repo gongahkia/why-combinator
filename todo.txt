@@ -1,4 +1,3 @@
-(A) Implement semantic summary generator for each submission using Codex with deterministic temperature settings +agents +summarization
 (A) Implement checkpoint scorer to skip submissions already scored under unchanged effective config +scoring +performance
 (A) Implement submission rescore trigger when forward config changes become active at next checkpoint +scoring +config
 (A) Implement stable deterministic tie-breaker using earlier accepted_at then lower total penalty then submission id +leaderboard +scoring
