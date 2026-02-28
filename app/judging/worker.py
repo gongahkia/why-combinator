@@ -35,17 +35,54 @@ def _build_judge_prompt(challenge_prompt: str, judge_profile_prompt: str, submis
     )
 
 
+def _build_judge_repair_prompt(original_prompt: str, invalid_response: str, validation_error: str) -> str:
+    return (
+        "Repair the previous judge output into strict JSON.\n"
+        "Rules:\n"
+        '- Return only one JSON object with keys "score", "rationale", "confidence".\n'
+        "- score and confidence must be numeric values between 0 and 1.\n"
+        "- rationale must be a concise string.\n"
+        f"Original prompt:\n{original_prompt}\n"
+        f"Invalid response:\n{invalid_response}\n"
+        f"Validation error:\n{validation_error}\n"
+        "Repaired JSON:"
+    )
+
+
 def request_codex_evaluation(prompt: str, trace_id: str | None = None) -> CodexJudgeResult:
     client = CodexClient(max_retries=3, backoff_base_seconds=0.5)
     try:
         response = client.call(CodexRequest(prompt=prompt, temperature=0.1, max_output_tokens=256))
-        parsed = validate_judge_response_json(response.text)
+        try:
+            parsed = validate_judge_response_json(response.text)
+        except ModelResponseValidationError as initial_error:
+            repair_prompt = _build_judge_repair_prompt(prompt, response.text, str(initial_error))
+            repair_response = client.call(CodexRequest(prompt=repair_prompt, temperature=0.0, max_output_tokens=192))
+            parsed = validate_judge_response_json(repair_response.text)
+            return CodexJudgeResult(
+                score=parsed.score,
+                rationale=parsed.rationale[:500],
+                raw_response={
+                    "provider": "codex",
+                    "fallback": False,
+                    "repaired": True,
+                    "response": response.raw,
+                    "repair_response": repair_response.raw,
+                    "parsed": {
+                        "score": parsed.score,
+                        "rationale": parsed.rationale,
+                        "confidence": parsed.confidence,
+                    },
+                    "trace_id": trace_id or "",
+                },
+            )
         return CodexJudgeResult(
             score=parsed.score,
             rationale=parsed.rationale[:500],
             raw_response={
                 "provider": "codex",
                 "fallback": False,
+                "repaired": False,
                 "response": response.raw,
                 "parsed": {
                     "score": parsed.score,
@@ -60,7 +97,7 @@ def request_codex_evaluation(prompt: str, trace_id: str | None = None) -> CodexJ
         score = round((digest[0] / 255.0), 4)
         return CodexJudgeResult(
             score=score,
-            rationale="Codex judge response failed schema validation; deterministic fallback score applied.",
+            rationale="Codex judge response failed schema validation after repair retry; fallback score applied.",
             raw_response={
                 "provider": "codex",
                 "fallback": True,
