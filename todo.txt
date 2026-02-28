@@ -1,4 +1,3 @@
-(A) Implement parser pipeline to auto-detect fetched profile content type and normalize to judge profile schema +ingest +judging
 (A) Implement validation rule requiring at least one domain_expert judge per challenge before run start +judging +validation
 (A) Implement API endpoint to start run that freezes initial config snapshot and emits run_started event +api +run
 (A) Implement baseline idea generator job at run start using Codex agent prompt template and store baseline vectors +orchestrator +novelty

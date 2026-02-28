@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import csv
 import io
-import json
 import uuid
 from datetime import datetime
 
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db_session
 from app.db.models import Challenge, JudgeProfile
+from app.ingest.profile_parser import ProfileParseError, parse_profile_payload
 from app.ingest.sanitize import URLSanitizationError, sanitize_ingestion_url
 from app.ingest.url_fetch import URLFetchError, fetch_url_content
 
@@ -178,15 +178,13 @@ async def register_judge_profile_url(
     try:
         sanitized_url = sanitize_ingestion_url(payload.url)
         content = fetch_url_content(sanitized_url, timeout_seconds=payload.timeout_seconds, max_bytes=payload.max_bytes)
+        source_format, parsed = parse_profile_payload(content)
     except URLSanitizationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url not allowed: {exc}") from exc
     except URLFetchError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url fetch failed: {exc}") from exc
-
-    try:
-        parsed = json.loads(content.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"fetched payload is not valid JSON: {exc}") from exc
+    except ProfileParseError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"unable to parse fetched profile: {exc}") from exc
 
     profiles = normalize_profiles(parsed)
-    return await persist_profiles(challenge_id, profiles, "url", session)
+    return await persist_profiles(challenge_id, profiles, f"url_{source_format}", session)
