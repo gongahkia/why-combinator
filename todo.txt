@@ -1,4 +1,3 @@
-(A) Implement per-run concurrency limiter for simultaneous active hacker containers +sandbox +capacity
 (A) Implement weighted fair scheduler across challenges to prevent single challenge starvation of queue resources +scheduler +queue
 (A) Implement container startup timeout guard that marks task failed when runtime boot exceeds configured threshold +sandbox +reliability
 (A) Implement sandbox network policy to block metadata endpoints and cloud instance identity IP ranges +sandbox +security

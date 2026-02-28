@@ -24,6 +24,7 @@ from app.queue.recovery import (
     remove_recoverable_task,
     track_in_flight_task,
 )
+from app.sandbox.concurrency import acquire_run_hacker_container_slot, release_run_hacker_container_slot
 
 _ACTIVE_TASK_IDS: set[str] = set()
 _ACTIVE_TASK_IDS_LOCK = threading.Lock()
@@ -223,7 +224,27 @@ def hacker_run(self, run_id: str, trace_id: str | None = None) -> dict[str, str]
         accepted, payload = _with_budget_guard(run_id, "hacker-run", default_cost=10)
         if not accepted:
             return {**payload, "trace_id": effective_trace_id}
-        return run_hacker_job(run_id, trace_id=effective_trace_id)
+        redis_client = create_redis_client()
+        try:
+            slot_acquired, remaining_slots = acquire_run_hacker_container_slot(redis_client, run_id)
+        finally:
+            redis_client.close()
+        if not slot_acquired:
+            return {
+                "job_type": "hacker-run",
+                "run_id": run_id,
+                "status": "concurrency_limited",
+                "remaining_slots": str(remaining_slots),
+                "trace_id": effective_trace_id,
+            }
+        try:
+            return run_hacker_job(run_id, trace_id=effective_trace_id)
+        finally:
+            redis_client = create_redis_client()
+            try:
+                release_run_hacker_container_slot(redis_client, run_id)
+            finally:
+                redis_client.close()
     except Exception as exc:  # noqa: BLE001
         if self.request.retries >= max_retries:
             persist_dead_letter_event("hacker-run", run_id, str(exc), self.request.retries)
