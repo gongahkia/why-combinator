@@ -97,6 +97,7 @@ def run_complete_run_job(run_id: str) -> dict[str, str]:
         "job_type": "run-complete",
         "run_id": run_id,
         "status": "completed",
+        "auto_attempts_created": str(result["auto_attempts_created"]),
         "finalized_submissions": str(result["finalized_submissions"]),
         "non_production_penalties": str(result["non_production_penalties"]),
         "leaderboard_entries": str(result["leaderboard_entries"]),

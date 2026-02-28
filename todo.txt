@@ -1,4 +1,3 @@
-(A) Implement enforcement that every Hacker Agent submits at least one attempt object before run close +agents +submissions
 (A) Implement heavy penalty multiplier config for agents with zero valid MVP submissions +penalties +scoring
 (A) Implement run bootstrap seeding of default judge panel domains when user panel is incomplete +judging +orchestrator
 (A) Implement compliance-domain auto-suggestion when prompt matches regulated keywords and user has no compliance judge +judging +policy
