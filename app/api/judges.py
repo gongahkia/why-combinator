@@ -223,7 +223,14 @@ async def register_judge_profile_url(
     except URLFetchError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url fetch failed: {exc}") from exc
     except ProfileParseError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"unable to parse fetched profile: {exc}") from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "code": "malformed_profile",
+                "message": "unable to parse fetched profile",
+                "parser_error": exc.as_payload(),
+            },
+        ) from exc
 
     profiles = normalize_profiles(parsed)
     return await persist_profiles(challenge_id, profiles, f"url_{source_format}", session)
