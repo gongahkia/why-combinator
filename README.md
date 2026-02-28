@@ -65,7 +65,7 @@ $ pytest -q
 
 ## Architecture
 
-...
+![](./asset/reference/architecture.png)
 
 ## Reference
 
