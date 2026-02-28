@@ -1,4 +1,3 @@
-(A) Add integration test for run timeout watchdog finalizing exactly at iteration deadline +tests +run
 (A) Add integration test for runtime validators covering CLI, API, web, and notebook artifact classes +tests +validation
 (A) Add integration test for leaderboard determinism with equal scores and tie-break conditions +tests +leaderboard
 (A) Add load test script simulating concurrent runs with periodic checkpoint scoring and Redis lock contention +tests +performance
