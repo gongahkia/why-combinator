@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import BaselineIdeaVector, Challenge, Run
 
 BASELINE_IDEA_COUNT = 3
-BASELINE_VECTOR_DIMENSIONS = 12
+BASELINE_VECTOR_DIMENSIONS = 16
 
 
 def build_codex_baseline_prompt(challenge: Challenge, count: int = BASELINE_IDEA_COUNT) -> str:
