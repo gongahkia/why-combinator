@@ -1,4 +1,3 @@
-(A) Implement URL fetch content hashing and cache keying in Redis to avoid repeated profile downloads +ingest +cache
 (A) Implement malformed profile rejection path with precise parser error payloads +ingest +api
 (A) Implement local artifact fingerprinting worker generating language, framework, and dependency signatures +artifacts +novelty
 (A) Implement semantic summary generator for each submission using Codex with deterministic temperature settings +agents +summarization

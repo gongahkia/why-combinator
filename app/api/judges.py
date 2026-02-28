@@ -7,7 +7,7 @@ from datetime import datetime
 import re
 
 import yaml
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,8 @@ from app.api.deps import get_db_session
 from app.db.models import Challenge, JudgeProfile
 from app.ingest.profile_parser import ProfileParseError, parse_profile_payload
 from app.ingest.sanitize import URLSanitizationError, sanitize_ingestion_url
-from app.ingest.url_fetch import URLFetchError, fetch_url_content
+from app.ingest.url_cache import fetch_url_content_cached
+from app.ingest.url_fetch import URLFetchError
 
 router = APIRouter(prefix="/challenges", tags=["judging"])
 
@@ -205,11 +206,17 @@ async def register_judge_profiles_csv(
 async def register_judge_profile_url(
     challenge_id: uuid.UUID,
     payload: JudgeProfileURLRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
 ) -> list[JudgeProfileResponse]:
     try:
         sanitized_url = sanitize_ingestion_url(payload.url)
-        content = fetch_url_content(sanitized_url, timeout_seconds=payload.timeout_seconds, max_bytes=payload.max_bytes)
+        content = await fetch_url_content_cached(
+            request.app.state.redis,
+            sanitized_url,
+            timeout_seconds=payload.timeout_seconds,
+            max_bytes=payload.max_bytes,
+        )
         source_format, parsed = parse_profile_payload(content)
     except URLSanitizationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"url not allowed: {exc}") from exc
