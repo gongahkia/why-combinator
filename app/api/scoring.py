@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import Select, desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,13 @@ class ScoringWeightsPayload(BaseModel):
     criteria: float = Field(ge=0.0)
     similarity_penalty: float = Field(ge=0.0)
     too_safe_penalty: float = Field(ge=0.0)
+
+    @model_validator(mode="after")
+    def validate_criteria_weights(self) -> ScoringWeightsPayload:
+        total = self.quality + self.novelty + self.feasibility + self.criteria
+        if abs(total - 1.0) > 1e-6:
+            raise ValueError("quality + novelty + feasibility + criteria must sum to 1.0")
+        return self
 
 
 class ScoringWeightsUpdateRequest(BaseModel):
