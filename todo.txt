@@ -1,4 +1,3 @@
-(A) Implement Alembic migration creating normalized tables with foreign keys, unique constraints, and created_at/updated_at indexes +db
 (A) Implement Postgres enum types for run_state, agent_role, submission_state, and artifact_type +db
 (A) Implement API endpoint to create challenge with iteration window, quality threshold, risk appetite, and slider value validation +api +challenge
 (A) Implement API endpoint to update scoring weights mid-run and persist effective_from timestamp for forward-only application +api +scoring
