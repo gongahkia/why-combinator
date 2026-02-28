@@ -20,7 +20,7 @@ from app.scoring.anti_gaming import detect_template_clone_penalty
 from app.scoring.checkpoint_snapshot import capture_checkpoint_snapshot
 from app.scoring.events import create_score_event_idempotent
 from app.scoring.feasibility import RuntimeValidationSignal, score_feasibility
-from app.scoring.final_score import ScoreComponents, compose_final_score
+from app.scoring.final_score import ScoreComponents, compose_final_score, load_score_component_bounds
 from app.scoring.novelty_normalization import normalize_novelty_score
 from app.scoring.penalty_events import create_penalty_event_append_only
 from app.scoring.quality import score_submission_quality
@@ -126,6 +126,7 @@ async def run_checkpoint_scoring_worker(
 
     active_weights_snapshot = await resolve_active_weights_snapshot(session, run_id, now)
     active_weights = asdict(active_weights_snapshot)
+    score_component_bounds = load_score_component_bounds()
     novelty_policy = resolve_novelty_penalty_sensitivity_policy(challenge.risk_appetite)
     sophistication_policy = resolve_artifact_sophistication_policy(challenge.complexity_slider)
     active_policies: dict[str, object] = {
@@ -137,6 +138,7 @@ async def run_checkpoint_scoring_worker(
         "novelty_penalty_sensitivity_multiplier": novelty_policy.sensitivity_multiplier,
         "artifact_sophistication_target": sophistication_policy.target_sophistication,
         "artifact_sophistication_tolerance": sophistication_policy.tolerance,
+        "score_component_bounds": asdict(score_component_bounds),
     }
     effective_config_checksum = _build_effective_config_checksum(active_weights, active_policies)
     await capture_checkpoint_snapshot(
@@ -216,7 +218,7 @@ async def run_checkpoint_scoring_worker(
             too_safe_penalty=adjusted_too_safe_penalty,
             non_production_penalty=0.0,
         )
-        breakdown = compose_final_score(components, active_weights_snapshot)
+        breakdown = compose_final_score(components, active_weights_snapshot, bounds=score_component_bounds)
         payload = breakdown.as_payload()
         payload["effective_config_checksum"] = effective_config_checksum
         payload["quality_gate_passed"] = quality_gate_passed

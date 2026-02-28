@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session
 from app.api.errors import SCORING_UNAVAILABLE_ERROR, VALIDATION_ERROR
 from app.db.models import Run, ScoringWeightConfig
+from app.scoring.replay import ReplayNotFoundError, ReplayValidationError, replay_scoring_from_frozen_snapshot
 
 router = APIRouter(prefix="/runs", tags=["scoring"])
 
@@ -45,6 +46,27 @@ class ScoringWeightsUpdateResponse(BaseModel):
     config_version: int
     created_at: datetime
     updated_at: datetime
+
+
+class ScoringReplayRequest(BaseModel):
+    checkpoint_id: str | None = None
+
+
+class ScoringReplaySubmission(BaseModel):
+    submission_id: uuid.UUID
+    original_final_score: float
+    replay_final_score: float
+    components: dict[str, float]
+
+
+class ScoringReplayResponse(BaseModel):
+    run_id: uuid.UUID
+    checkpoint_id: str
+    captured_at: datetime
+    active_weights: dict[str, float]
+    active_policies: dict[str, object]
+    config_snapshot: dict[str, object]
+    submissions: list[ScoringReplaySubmission]
 
 
 @router.post(
@@ -105,4 +127,47 @@ async def update_scoring_weights(
         config_version=run.config_version,
         created_at=config.created_at,
         updated_at=config.updated_at,
+    )
+
+
+@router.post(
+    "/{run_id}/replay",
+    response_model=ScoringReplayResponse,
+    responses={
+        422: VALIDATION_ERROR,
+        503: SCORING_UNAVAILABLE_ERROR,
+    },
+)
+async def replay_run_scoring(
+    run_id: uuid.UUID,
+    payload: ScoringReplayRequest,
+    session: AsyncSession = Depends(get_db_session),
+) -> ScoringReplayResponse:
+    try:
+        replay = await replay_scoring_from_frozen_snapshot(
+            session,
+            run_id=run_id,
+            checkpoint_id=payload.checkpoint_id,
+        )
+    except ReplayNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ReplayValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+
+    return ScoringReplayResponse(
+        run_id=replay.run_id,
+        checkpoint_id=replay.checkpoint_id,
+        captured_at=replay.captured_at,
+        active_weights=replay.active_weights,
+        active_policies=replay.active_policies,
+        config_snapshot=replay.config_snapshot,
+        submissions=[
+            ScoringReplaySubmission(
+                submission_id=item.submission_id,
+                original_final_score=item.original_final_score,
+                replay_final_score=item.replay_final_score,
+                components=item.components,
+            )
+            for item in replay.submissions
+        ],
     )

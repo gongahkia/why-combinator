@@ -175,8 +175,12 @@ def apply_score_component_bounds(
     )
 
 
-def compose_final_score(components: ScoreComponents, weights: ActiveWeightsSnapshot) -> FinalScoreBreakdown:
-    bounded_components = apply_score_component_bounds(components)
+def compose_final_score(
+    components: ScoreComponents,
+    weights: ActiveWeightsSnapshot,
+    bounds: ScoreComponentBounds | None = None,
+) -> FinalScoreBreakdown:
+    bounded_components = apply_score_component_bounds(components, bounds=bounds)
     weighted_positive = (
         bounded_components.quality * weights.quality
         + bounded_components.novelty * weights.novelty
