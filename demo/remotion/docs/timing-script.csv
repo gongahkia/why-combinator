@@ -1,0 +1,11 @@
+segment,start_seconds,end_seconds,start_frame,end_frame,voiceover
+intro_hook,0,8,0,239,"This is an autonomous hackathon orchestration system that takes ideas from challenge prompt to judged leaderboard with reproducible scoring."
+challenge_setup,8,24,240,719,"An organizer defines the challenge prompt, scoring posture, and run constraints in under a minute."
+run_start,24,36,720,1079,"Starting a run captures a deterministic seed and frozen configuration snapshot for replay-safe evaluation."
+agent_execution,36,54,1080,1619,"Agents execute in isolated sandboxes, with budget guards, spawn controls, and resilient task recovery."
+judge_ingestion,54,68,1620,2039,"Judge profiles can be registered from JSON, YAML, CSV, or URL ingestion paths protected by network and redirect-chain guards."
+checkpoint_scoring,68,84,2040,2519,"Checkpoint scoring blends quality, novelty, feasibility, and criteria with configurable novelty strategy and anti-gaming penalties."
+replay_analytics,84,96,2520,2879,"Every checkpoint can be replayed against frozen snapshots, producing deterministic score diffs for audit and analytics."
+leaderboard_realtime,96,110,2880,3299,"Leaderboard updates stream in real time, with stable cursor pagination and optional segmentation filters by team or track."
+artifact_retrieval,110,118,3300,3539,"Artifacts are scanned, retained by policy, and served through short-lived signed URLs for controlled access."
+closing_cta,118,120,3540,3599,"The full flow is automated, observable, and reproducible end to end."
