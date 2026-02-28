@@ -44,6 +44,9 @@ class LocalObjectStorageAdapter:
         self._root.mkdir(parents=True, exist_ok=True)
         (self._root / "blobs").mkdir(parents=True, exist_ok=True)
 
+    def _resolve(self, storage_key: str) -> Path:
+        return self._root / storage_key
+
     def put_object(self, submission_id: uuid.UUID, original_filename: str, content: bytes) -> str:
         content_hash = hashlib.sha256(content).hexdigest()
         safe_name = original_filename.replace("/", "_").replace("\\", "_")
@@ -62,3 +65,25 @@ class LocalObjectStorageAdapter:
         except OSError:
             target.write_bytes(content)
         return key
+
+    def get_object(self, storage_key: str) -> bytes:
+        target = self._resolve(storage_key)
+        if not target.exists():
+            raise FileNotFoundError(storage_key)
+        return target.read_bytes()
+
+    def get_object_size(self, storage_key: str) -> int | None:
+        target = self._resolve(storage_key)
+        if not target.exists():
+            return None
+        return target.stat().st_size
+
+    def exists(self, storage_key: str) -> bool:
+        return self._resolve(storage_key).exists()
+
+    def delete_object(self, storage_key: str) -> bool:
+        target = self._resolve(storage_key)
+        if not target.exists() and not target.is_symlink():
+            return False
+        target.unlink(missing_ok=True)
+        return True

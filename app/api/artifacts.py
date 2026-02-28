@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
@@ -15,7 +14,8 @@ from app.db.enums import ArtifactType
 from app.db.models import Artifact, Challenge, Run, Submission
 from app.artifacts.retention import ArtifactRetentionPolicyError, compute_artifact_expiry
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
-from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
+from app.storage.adapter import ObjectStorageAdapter, build_object_storage_adapter
+from app.storage.local import ArchiveExtractionError, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
 from app.validation.readme import validate_minimum_readme_content
 from app.validation.value_hypothesis import validate_measurable_value_hypothesis
@@ -78,14 +78,14 @@ async def upload_artifact(
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="artifact file is empty")
+    adapter = build_object_storage_adapter(request.app.state.settings.artifact_storage_path)
     artifact_stmt: Select[tuple[Artifact]] = select(Artifact).where(Artifact.submission_id == submission_id)
     existing_artifacts = (await session.execute(artifact_stmt)).scalars().all()
-    storage_root = Path(request.app.state.settings.artifact_storage_path)
     existing_total_bytes = 0
     for artifact in existing_artifacts:
-        path = storage_root / artifact.storage_key
-        if path.exists():
-            existing_total_bytes += path.stat().st_size
+        size = adapter.get_object_size(artifact.storage_key)
+        if size is not None:
+            existing_total_bytes += size
     try:
         validate_artifact_submission_limits(
             existing_count=len(existing_artifacts),
@@ -109,7 +109,6 @@ async def upload_artifact(
             detail=f"artifact blocked by malware scanner ({exc.engine}): {exc.reason}",
         ) from exc
 
-    adapter = LocalObjectStorageAdapter(request.app.state.settings.artifact_storage_path)
     storage_key = adapter.put_object(submission_id, file.filename or "artifact.bin", content)
     content_hash = hashlib.sha256(content).hexdigest()
     challenge_ttl_override = challenge.artifact_ttl_override_seconds if challenge is not None else None
@@ -149,10 +148,12 @@ def _looks_like_readme(storage_key: str) -> bool:
     return filename.lower().startswith("readme")
 
 
-def _read_readme_text(path: Path) -> str | None:
-    if not path.exists():
+def _read_readme_text(adapter: ObjectStorageAdapter, storage_key: str) -> str | None:
+    try:
+        content = adapter.get_object(storage_key)
+    except FileNotFoundError:
         return None
-    return path.read_text(encoding="utf-8", errors="ignore")
+    return content.decode("utf-8", errors="ignore")
 
 
 @router.get(
@@ -170,6 +171,7 @@ async def validate_submission_mandatory_requirements(
 
     artifact_stmt: Select[tuple[Artifact]] = select(Artifact).where(Artifact.submission_id == submission_id)
     artifacts = (await session.execute(artifact_stmt)).scalars().all()
+    adapter = build_object_storage_adapter(request.app.state.settings.artifact_storage_path)
     errors: list[str] = []
 
     errors.extend(validate_measurable_value_hypothesis(submission.value_hypothesis))
@@ -180,8 +182,7 @@ async def validate_submission_mandatory_requirements(
     if readme_artifact is None:
         errors.append("README artifact is required")
     else:
-        readme_path = Path(request.app.state.settings.artifact_storage_path) / readme_artifact.storage_key
-        readme_text = _read_readme_text(readme_path)
+        readme_text = _read_readme_text(adapter, readme_artifact.storage_key)
         if readme_text is None:
             errors.append("README artifact is required")
         else:
