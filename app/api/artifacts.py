@@ -16,6 +16,7 @@ from app.db.models import Artifact, Submission
 from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import ArchiveExtractionError, LocalObjectStorageAdapter, validate_archive_members_safe
 from app.validation.artifact_limits import ArtifactLimitError, validate_artifact_submission_limits
+from app.validation.readme import validate_minimum_readme_content
 
 router = APIRouter(prefix="/submissions", tags=["artifacts"])
 
@@ -135,11 +136,10 @@ def _looks_like_readme(storage_key: str) -> bool:
     return filename.lower().startswith("readme")
 
 
-def _is_short_readme(path: Path, max_chars: int = 3000) -> bool:
+def _read_readme_text(path: Path) -> str | None:
     if not path.exists():
-        return False
-    text = path.read_text(encoding="utf-8", errors="ignore").strip()
-    return bool(text) and len(text) <= max_chars
+        return None
+    return path.read_text(encoding="utf-8", errors="ignore")
 
 
 @router.get(
@@ -169,8 +169,11 @@ async def validate_submission_mandatory_requirements(
         errors.append("README artifact is required")
     else:
         readme_path = Path(request.app.state.settings.artifact_storage_path) / readme_artifact.storage_key
-        if not _is_short_readme(readme_path):
-            errors.append("README artifact must be non-empty and at most 3000 characters")
+        readme_text = _read_readme_text(readme_path)
+        if readme_text is None:
+            errors.append("README artifact is required")
+        else:
+            errors.extend(validate_minimum_readme_content(readme_text))
 
     return SubmissionValidationResponse(
         submission_id=submission_id,
