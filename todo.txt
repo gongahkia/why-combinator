@@ -1,4 +1,3 @@
-(A) Implement novelty score normalization to avoid penalizing near-duplicates beyond configured floor +novelty +scoring
 (A) Implement run-level diversity index computation from accepted MVP embedding cluster dispersion +analytics +novelty
 (A) Implement metric emitter for accepted MVP count, median time to first accepted MVP, diversity index, and producer share +analytics +metrics
 (A) Implement structured event bus payloads for run lifecycle and scoring lifecycle events +events +orchestrator
