@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import subprocess
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +51,11 @@ class RunStateTransitionRequest(BaseModel):
     state: RunState
 
 
+class RunStartRequest(BaseModel):
+    team_label: str | None = Field(default=None, min_length=1, max_length=64)
+    track_label: str | None = Field(default=None, min_length=1, max_length=64)
+
+
 @router.post(
     "/{challenge_id}/runs/start",
     status_code=status.HTTP_201_CREATED,
@@ -64,6 +69,7 @@ class RunStateTransitionRequest(BaseModel):
 async def start_run(
     challenge_id: uuid.UUID,
     request: Request,
+    payload: RunStartRequest | None = None,
     _rate_limit: None = rate_limit_dependency("run-control", capacity=20, refill_per_second=0.5),
     session: AsyncSession = Depends(get_db_session),
 ) -> RunResponse:
@@ -93,6 +99,14 @@ async def start_run(
 
     judge_stmt: Select[tuple[JudgeProfile]] = select(JudgeProfile).where(JudgeProfile.challenge_id == challenge_id)
     judge_profiles = (await session.execute(judge_stmt)).scalars().all()
+    segmentation_labels: dict[str, str] = {}
+    if payload is not None:
+        team_label = payload.team_label.strip() if payload.team_label is not None else ""
+        track_label = payload.track_label.strip() if payload.track_label is not None else ""
+        if team_label:
+            segmentation_labels["team"] = team_label
+        if track_label:
+            segmentation_labels["track"] = track_label
     config_snapshot = {
         "challenge": {
             "id": str(challenge.id),
@@ -115,6 +129,7 @@ async def start_run(
             }
             for profile in judge_profiles
         ],
+        "segmentation": segmentation_labels,
     }
     started_at = datetime.now(timezone.utc)
     run = Run(

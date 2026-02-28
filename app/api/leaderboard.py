@@ -4,6 +4,7 @@ import base64
 import json
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -35,12 +36,15 @@ class LeaderboardItemResponse(BaseModel):
     active_penalties: list[PenaltySnippet]
     judge_rationale_snippets: list[str]
     tie_break_metadata: dict[str, object]
+    segment_labels: dict[str, str]
 
 
 class LeaderboardResponse(BaseModel):
     run_id: uuid.UUID
     generated_at: datetime
     items: list[LeaderboardItemResponse]
+    grouped_by: Literal["team", "track"] | None = None
+    group_key: str | None = None
 
 
 class PaginatedLeaderboardResponse(BaseModel):
@@ -49,6 +53,8 @@ class PaginatedLeaderboardResponse(BaseModel):
     items: list[LeaderboardItemResponse]
     next_cursor: str | None
     has_more: bool
+    grouped_by: Literal["team", "track"] | None = None
+    group_key: str | None = None
 
 
 LeaderboardRow = tuple[int, uuid.UUID, float, dict[str, object]]
@@ -124,6 +130,7 @@ async def _load_entry_rows(session: AsyncSession, run_id: uuid.UUID) -> list[Lea
 async def _build_leaderboard_items(
     session: AsyncSession,
     entry_rows: list[LeaderboardRow],
+    segment_labels: dict[str, str],
 ) -> list[LeaderboardItemResponse]:
     items: list[LeaderboardItemResponse] = []
     for rank, submission_id, final_score, tie_break_metadata in entry_rows:
@@ -161,27 +168,84 @@ async def _build_leaderboard_items(
                 ],
                 judge_rationale_snippets=[row.rationale[:300] for row in judge_scores[:3]],
                 tie_break_metadata=tie_break_metadata,
+                segment_labels=segment_labels,
             )
         )
     return items
 
 
+def _extract_segmentation_labels(run: Run) -> dict[str, str]:
+    config_snapshot = run.config_snapshot if isinstance(run.config_snapshot, dict) else {}
+    segmentation = config_snapshot.get("segmentation")
+    if not isinstance(segmentation, dict):
+        return {}
+
+    labels: dict[str, str] = {}
+    for key in ("team", "track"):
+        raw_value = segmentation.get(key)
+        if isinstance(raw_value, str):
+            normalized = raw_value.strip()
+            if normalized:
+                labels[key] = normalized
+    return labels
+
+
+def _run_matches_segmentation_filter(run_labels: dict[str, str], team: str | None, track: str | None) -> bool:
+    if team is not None and run_labels.get("team") != team:
+        return False
+    if track is not None and run_labels.get("track") != track:
+        return False
+    return True
+
+
+def _normalize_segment_filter(value: object) -> str | None:
+    if isinstance(value, str):
+        normalized = value.strip()
+        return normalized if normalized else None
+    return None
+
+
+def _normalize_group_by(value: object) -> Literal["team", "track"] | None:
+    if value in {"team", "track"}:
+        return value
+    return None
+
+
 @router.get("/{run_id}/leaderboard", response_model=LeaderboardResponse)
 async def get_leaderboard(
     run_id: uuid.UUID,
+    team: str | None = Query(default=None, min_length=1, max_length=64),
+    track: str | None = Query(default=None, min_length=1, max_length=64),
+    group_by: Literal["team", "track"] | None = Query(default=None),
     session: AsyncSession = Depends(get_db_session),
 ) -> LeaderboardResponse:
     run = await session.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
 
+    team_filter = _normalize_segment_filter(team)
+    track_filter = _normalize_segment_filter(track)
+    group_by_value = _normalize_group_by(group_by)
+
+    segment_labels = _extract_segmentation_labels(run)
+    if not _run_matches_segmentation_filter(segment_labels, team_filter, track_filter):
+        return LeaderboardResponse(
+            run_id=run_id,
+            generated_at=datetime.now(UTC),
+            items=[],
+            grouped_by=group_by_value,
+            group_key=segment_labels.get(group_by_value) if group_by_value is not None else None,
+        )
+
     entry_rows = await _load_entry_rows(session, run_id)
-    items = await _build_leaderboard_items(session, entry_rows)
+    items = await _build_leaderboard_items(session, entry_rows, segment_labels)
 
     return LeaderboardResponse(
         run_id=run_id,
         generated_at=datetime.now(UTC),
         items=items,
+        grouped_by=group_by_value,
+        group_key=segment_labels.get(group_by_value) if group_by_value is not None else None,
     )
 
 
@@ -190,11 +254,30 @@ async def get_leaderboard_paginated(
     run_id: uuid.UUID,
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
+    team: str | None = Query(default=None, min_length=1, max_length=64),
+    track: str | None = Query(default=None, min_length=1, max_length=64),
+    group_by: Literal["team", "track"] | None = Query(default=None),
     session: AsyncSession = Depends(get_db_session),
 ) -> PaginatedLeaderboardResponse:
     run = await session.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+
+    team_filter = _normalize_segment_filter(team)
+    track_filter = _normalize_segment_filter(track)
+    group_by_value = _normalize_group_by(group_by)
+
+    segment_labels = _extract_segmentation_labels(run)
+    if not _run_matches_segmentation_filter(segment_labels, team_filter, track_filter):
+        return PaginatedLeaderboardResponse(
+            run_id=run_id,
+            generated_at=datetime.now(UTC),
+            items=[],
+            next_cursor=None,
+            has_more=False,
+            grouped_by=group_by_value,
+            group_key=segment_labels.get(group_by_value) if group_by_value is not None else None,
+        )
 
     snapshot_id: str
     offset: int
@@ -222,7 +305,7 @@ async def get_leaderboard_paginated(
         offset = offset_raw
 
     page_rows = snapshot_rows[offset : offset + limit]
-    items = await _build_leaderboard_items(session, page_rows)
+    items = await _build_leaderboard_items(session, page_rows, segment_labels)
 
     next_offset = offset + len(page_rows)
     has_more = next_offset < len(snapshot_rows)
@@ -234,4 +317,6 @@ async def get_leaderboard_paginated(
         items=items,
         next_cursor=next_cursor,
         has_more=has_more,
+        grouped_by=group_by_value,
+        group_key=segment_labels.get(group_by_value) if group_by_value is not None else None,
     )

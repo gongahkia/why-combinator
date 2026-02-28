@@ -1,4 +1,3 @@
-(B) Implement run segmentation labels to group results by team or track and filter leaderboard output +leaderboard +challenge
 (B) Implement advanced artifact fingerprinting for AST-level similarity on supported languages +novelty +artifacts
 (B) Implement configurable novelty strategy selector between embedding-only and hybrid overlap modes +novelty +config
 (B) Implement checkpoint jitter control to stagger large run scoring waves and reduce queue spikes +scheduler +performance
