@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db_session
 from app.db.enums import ArtifactType
 from app.db.models import Artifact, Submission
+from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import LocalObjectStorageAdapter
 
 router = APIRouter(prefix="/submissions", tags=["artifacts"])
@@ -71,6 +72,13 @@ async def upload_artifact(
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="artifact file is empty")
+    try:
+        scan_artifact_or_raise(file.filename or "artifact.bin", content)
+    except MalwareScanError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"artifact blocked by malware scanner ({exc.engine}): {exc.reason}",
+        ) from exc
 
     adapter = LocalObjectStorageAdapter(request.app.state.settings.artifact_storage_path)
     storage_key = adapter.put_object(submission_id, file.filename or "artifact.bin", content)

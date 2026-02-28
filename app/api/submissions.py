@@ -19,6 +19,7 @@ from app.db.models import Agent, Run, Submission
 from app.db.enums import ArtifactType
 from app.db.models import Artifact, Challenge
 from app.orchestrator.submission_summary import generate_submission_semantic_summary
+from app.security.malware import MalwareScanError, scan_artifact_or_raise
 from app.storage.local import LocalObjectStorageAdapter
 
 router = APIRouter(prefix="/runs", tags=["submissions"])
@@ -145,6 +146,13 @@ async def ingest_submission_transactional(
         artifact_ids: list[uuid.UUID] = []
         for artifact_input in payload.artifacts:
             content = base64.b64decode(artifact_input.content_base64)
+            try:
+                scan_artifact_or_raise(artifact_input.filename, content)
+            except MalwareScanError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"artifact blocked by malware scanner ({exc.engine}): {exc.reason}",
+                ) from exc
             storage_key = adapter.put_object(submission.id, artifact_input.filename, content)
             artifact = Artifact(
                 submission_id=submission.id,

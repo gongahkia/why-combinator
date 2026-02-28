@@ -1,4 +1,3 @@
-(A) Implement artifact malware scan hook using pluggable scanner interface before artifact acceptance +security +artifacts
 (A) Implement archive extraction guard preventing zip-slip path traversal on uploaded artifacts +security +artifacts
 (A) Implement max artifact count and max total artifact size validation per submission +validation +artifacts
 (A) Implement duplicate artifact detection by content hash and soft-link reuse in storage layer +artifacts +storage
