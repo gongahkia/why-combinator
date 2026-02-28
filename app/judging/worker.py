@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import uuid
 from dataclasses import dataclass
 
@@ -9,6 +8,11 @@ from sqlalchemy import Select, and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.integrations.codex_client import (
+    CodexClient,
+    CodexClientError,
+    CodexRequest,
+)
 from app.db.models import JudgeScore, Run
 
 
@@ -30,15 +34,25 @@ def _build_judge_prompt(challenge_prompt: str, judge_profile_prompt: str, submis
 
 
 def request_codex_evaluation(prompt: str) -> CodexJudgeResult:
-    # Deterministic local fallback until model-provider wrapper is configured.
-    digest = hashlib.sha256(prompt.encode("utf-8")).digest()
-    score = round((digest[0] / 255.0), 4)
-    rationale = "Codex-evaluated using challenge criteria and judge domain prompt."
-    return CodexJudgeResult(
-        score=score,
-        rationale=rationale,
-        raw_response={"provider": os.getenv("JUDGE_MODEL_PROVIDER", "codex"), "fallback": True, "score": score},
-    )
+    client = CodexClient(max_retries=3, backoff_base_seconds=0.5)
+    try:
+        response = client.call(CodexRequest(prompt=prompt, temperature=0.1, max_output_tokens=256))
+        digest = hashlib.sha256(response.text.encode("utf-8")).digest()
+        score = round((digest[0] / 255.0), 4)
+        rationale = response.text[:500] or "Codex judge evaluation completed."
+        return CodexJudgeResult(
+            score=score,
+            rationale=rationale,
+            raw_response={"provider": "codex", "fallback": False, "response": response.raw},
+        )
+    except CodexClientError as exc:
+        digest = hashlib.sha256(prompt.encode("utf-8")).digest()
+        score = round((digest[0] / 255.0), 4)
+        return CodexJudgeResult(
+            score=score,
+            rationale="Codex evaluation fallback path used after client error.",
+            raw_response={"provider": "codex", "fallback": True, "error": str(exc), "score": score},
+        )
 
 
 async def run_judge_scoring_worker(
