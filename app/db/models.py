@@ -43,6 +43,9 @@ class Run(TimestampMixin, Base):
     scoring_weight_configs: Mapped[list[ScoringWeightConfig]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
+    checkpoint_snapshots: Mapped[list[CheckpointSnapshot]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
     baseline_idea_vectors: Mapped[list[BaselineIdeaVector]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
@@ -228,6 +231,19 @@ class IdempotencyKey(TimestampMixin, Base):
     key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     request_hash: Mapped[str] = mapped_column(String(128), nullable=False)
     response_payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+
+
+class CheckpointSnapshot(TimestampMixin, Base):
+    __tablename__ = "checkpoint_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    checkpoint_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    captured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    active_weights: Mapped[dict[str, float]] = mapped_column(JSON, nullable=False)
+    active_policies: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+
+    run: Mapped[Run] = relationship(back_populates="checkpoint_snapshots")
 
 
 class ChallengeApiKey(TimestampMixin, Base):
