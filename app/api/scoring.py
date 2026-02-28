@@ -19,8 +19,8 @@ class ScoringWeightsPayload(BaseModel):
     novelty: float = Field(ge=0.0)
     feasibility: float = Field(ge=0.0)
     criteria: float = Field(ge=0.0)
-    similarity_penalty: float = Field(ge=0.0)
-    too_safe_penalty: float = Field(ge=0.0)
+    similarity_penalty: float = Field(ge=0.0, le=1.0)
+    too_safe_penalty: float = Field(ge=0.0, le=1.0)
 
     @model_validator(mode="after")
     def validate_criteria_weights(self) -> ScoringWeightsPayload:

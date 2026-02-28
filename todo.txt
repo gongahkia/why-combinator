@@ -1,4 +1,3 @@
-(A) Implement penalty weight validator for similarity and too-safe penalties with bounded ranges +scoring +validation
 (A) Implement feasibility scorer extracting build/run signal from runtime validator outputs and dependency resolution logs +scoring +validation
 (A) Implement quality scorer rubric that maps judge outputs into normalized numeric scale +scoring +judging
 (A) Implement novelty score normalization to avoid penalizing near-duplicates beyond configured floor +novelty +scoring
