@@ -34,6 +34,7 @@ class Run(TimestampMixin, Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     config_snapshot: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    config_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     challenge: Mapped[Challenge] = relationship(back_populates="runs")
     agents: Mapped[list[Agent]] = relationship(back_populates="run", cascade="all, delete-orphan")

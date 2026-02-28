@@ -24,6 +24,7 @@ class ScoringWeightsPayload(BaseModel):
 
 
 class ScoringWeightsUpdateRequest(BaseModel):
+    expected_config_version: int = Field(ge=0)
     effective_from: datetime
     weights: ScoringWeightsPayload
 
@@ -33,6 +34,7 @@ class ScoringWeightsUpdateResponse(BaseModel):
     run_id: uuid.UUID
     effective_from: datetime
     weights: ScoringWeightsPayload
+    config_version: int
     created_at: datetime
     updated_at: datetime
 
@@ -46,6 +48,14 @@ async def update_scoring_weights(
     run = await session.get(Run, run_id)
     if run is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="run not found")
+    if payload.expected_config_version != run.config_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "config version mismatch: expected "
+                f"{payload.expected_config_version}, current {run.config_version}"
+            ),
+        )
 
     stmt: Select[tuple[ScoringWeightConfig]] = (
         select(ScoringWeightConfig)
@@ -66,14 +76,17 @@ async def update_scoring_weights(
         weights=payload.weights.model_dump(),
     )
     session.add(config)
+    run.config_version += 1
     await session.commit()
     await session.refresh(config)
+    await session.refresh(run)
 
     return ScoringWeightsUpdateResponse(
         id=config.id,
         run_id=config.run_id,
         effective_from=config.effective_from,
         weights=ScoringWeightsPayload(**config.weights),
+        config_version=run.config_version,
         created_at=config.created_at,
         updated_at=config.updated_at,
     )
