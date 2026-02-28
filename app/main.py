@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.api.challenges import router as challenges_router
 from app.api.judges import router as judges_router
+from app.api.runs import router as runs_router
 from app.api.scoring import router as scoring_router
 from app.config import Settings, load_settings
 
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Hackathon Service", lifespan=lifespan)
 app.include_router(challenges_router)
 app.include_router(judges_router)
+app.include_router(runs_router)
 app.include_router(scoring_router)
 
 
