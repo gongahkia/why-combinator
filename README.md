@@ -23,6 +23,18 @@
 * **Market simulation overlay**: Map run constraints into startup-market stress metrics (adoption, churn, burn, runway, recommendation).
 * **Rate limiting and quota enforcement**: Per-user token-bucket rate limits and soft quota caps on challenges, runs, and artifact storage.
 
+## Screenshots
+
+<div align="center">
+    <img src="./asset/reference/1.png" width="45%">
+    <img src="./asset/reference/4.png" width="45%">
+</div>
+
+<div align="center">
+    <img src="./asset/reference/2.png" width="45%">
+    <img src="./asset/reference/3.png" width="45%">
+</div>
+
 ## Usage
 
 1. Clone and install dependencies.
