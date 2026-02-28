@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import load_settings
+from app.events.outbox import relay_outbox_events
 from app.judging.worker import run_judge_scoring_worker
 from app.orchestrator.run_completion import complete_run
 from app.orchestrator.subagent_quota import check_and_reserve_subagent_quota
@@ -148,6 +149,35 @@ def run_complete_run_job(run_id: str, trace_id: str | None = None) -> dict[str, 
         "non_production_penalties": str(result["non_production_penalties"]),
         "leaderboard_entries": str(result["leaderboard_entries"]),
         "trace_id": trace_id or "",
+    }
+
+
+def run_outbox_relay_job(trace_id: str | None = None, batch_size: int | None = None) -> dict[str, str]:
+    async def _run() -> dict[str, str]:
+        settings = load_settings()
+        engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        redis_client = create_redis_client()
+        try:
+            async with session_factory() as session:
+                result = await relay_outbox_events(session, redis_client, batch_size=batch_size)
+                await session.commit()
+        finally:
+            redis_client.close()
+            await engine.dispose()
+        return {
+            "processed": str(result.processed),
+            "published": str(result.published),
+            "deduplicated": str(result.deduplicated),
+            "failed": str(result.failed),
+        }
+
+    details = asyncio.run(_run())
+    return {
+        "job_type": "outbox-relay",
+        "status": "completed",
+        "trace_id": trace_id or "",
+        **details,
     }
 
 

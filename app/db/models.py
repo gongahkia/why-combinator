@@ -257,3 +257,16 @@ class ChallengeApiKey(TimestampMixin, Base):
     key_prefix: Mapped[str] = mapped_column(String(16), nullable=False)
     key_last4: Mapped[str] = mapped_column(String(4), nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False, index=True)
+
+
+class OutboxEvent(TimestampMixin, Base):
+    __tablename__ = "outbox_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    stream_name: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    event_key: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    payload: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    publish_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)

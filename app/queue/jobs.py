@@ -14,7 +14,13 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from app.config import load_settings
 from app.observability.trace import ensure_trace_id
 from app.observability.trace import new_trace_id
-from app.orchestrator.jobs import run_checkpoint_score_job, run_complete_run_job, run_hacker_job, run_judge_job
+from app.orchestrator.jobs import (
+    run_checkpoint_score_job,
+    run_complete_run_job,
+    run_hacker_job,
+    run_judge_job,
+    run_outbox_relay_job,
+)
 from app.queue.checkpoint_backfill import (
     clear_failed_checkpoint_backfill,
     list_failed_checkpoint_backfills,
@@ -457,6 +463,18 @@ def backfill_failed_checkpoints(self, trace_id: str | None = None) -> dict[str, 
         }
     finally:
         redis_client.close()
+
+
+@shared_task(
+    name="app.queue.jobs.relay_outbox_events",
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def relay_outbox_events(self, trace_id: str | None = None) -> dict[str, str]:
+    effective_trace_id = ensure_trace_id(trace_id)
+    return run_outbox_relay_job(trace_id=effective_trace_id)
 
 
 @shared_task(

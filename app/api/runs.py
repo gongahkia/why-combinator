@@ -14,7 +14,8 @@ from app.api.errors import BUDGET_EXHAUSTED_ERROR, SANDBOX_FAILURE_ERROR, VALIDA
 from app.api.rate_limit import rate_limit_dependency
 from app.db.enums import RunState
 from app.db.models import Challenge, JudgeProfile, Run
-from app.events.bus import emit_run_event, make_run_lifecycle_event
+from app.events.bus import make_run_lifecycle_event
+from app.events.outbox import enqueue_run_lifecycle_event_outbox
 from app.orchestrator.baseline import run_baseline_idea_generator_job
 from app.orchestrator.admission import evaluate_run_admission_capacity
 from app.orchestrator.judge_bootstrap import seed_default_judge_panel_if_incomplete
@@ -117,11 +118,6 @@ async def start_run(
     session.add(run)
     await session.flush()
     baseline_rows = await run_baseline_idea_generator_job(session, run, challenge)
-    await session.commit()
-    await session.refresh(run)
-    budget_key = f"run:{run.id}:budget_remaining"
-    await request.app.state.redis.setnx(budget_key, request.app.state.settings.default_run_budget_units)
-
     event = make_run_lifecycle_event(
         event_type="run_started",
         run_id=run.id,
@@ -129,11 +125,15 @@ async def start_run(
         payload={
             "config_snapshot": config_snapshot,
             "baseline_vector_count": len(baseline_rows),
-            "budget_key": budget_key,
+            "budget_key": f"run:{run.id}:budget_remaining",
             "started_at": started_at.isoformat(),
         },
     )
-    await emit_run_event(request.app.state.redis, event)
+    await enqueue_run_lifecycle_event_outbox(session, event)
+    await session.commit()
+    await session.refresh(run)
+    budget_key = f"run:{run.id}:budget_remaining"
+    await request.app.state.redis.setnx(budget_key, request.app.state.settings.default_run_budget_units)
 
     return RunResponse.model_validate(run, from_attributes=True)
 
