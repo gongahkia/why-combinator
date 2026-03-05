@@ -3,7 +3,7 @@
 
 # `Why-Combinator`
 
-[CLI](https://aws.amazon.com/what-is/cli/) and [API](https://en.wikipedia.org/wiki/API)-first [multi-agent orchestration](#architecture) platform with [market-simulation](#what-why-combinator-can-do-for-now) analytics.
+[CLI](https://aws.amazon.com/what-is/cli/)-first [multi-agent orchestration](#architecture) pipeline with comprehensive [market-simulation](#what-why-combinator-can-do-for-now) for Hackathons.
 
 ## Stack
 
